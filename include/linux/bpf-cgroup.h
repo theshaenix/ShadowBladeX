@@ -101,36 +101,9 @@ int __cgroup_bpf_check_dev_permission(short dev_type, u32 major, u32 minor,
 #define BPF_CGROUP_RUN_SK_PROG(sk, type)				       \
 ({									       \
 	int __ret = 0;							       \
-	if (cgroup_bpf_enabled && sk) {					       \
-		__ret = __cgroup_bpf_run_filter_sk(sk, type);		       \
-	}								       \
-	__ret;								       \
-})
-
-#define BPF_CGROUP_RUN_PROG_INET_SOCK(sk)				       \
-	BPF_CGROUP_RUN_SK_PROG(sk, BPF_CGROUP_INET_SOCK_CREATE)
-
-#define BPF_CGROUP_RUN_PROG_INET4_POST_BIND(sk)				       \
-	BPF_CGROUP_RUN_SK_PROG(sk, BPF_CGROUP_INET4_POST_BIND)
-
-#define BPF_CGROUP_RUN_PROG_INET6_POST_BIND(sk)				       \
-	BPF_CGROUP_RUN_SK_PROG(sk, BPF_CGROUP_INET6_POST_BIND)
-
-#define BPF_CGROUP_RUN_SA_PROG(sk, uaddr, type)				       \
-({									       \
-	int __ret = 0;							       \
-	if (cgroup_bpf_enabled)						       \
-		__ret = __cgroup_bpf_run_filter_sock_addr(sk, uaddr, type);    \
-	__ret;								       \
-})
-
-#define BPF_CGROUP_RUN_SA_PROG_LOCK(sk, uaddr, type)			       \
-({									       \
-	int __ret = 0;							       \
-	if (cgroup_bpf_enabled)	{					       \
-		lock_sock(sk);						       \
-		__ret = __cgroup_bpf_run_filter_sock_addr(sk, uaddr, type);    \
-		release_sock(sk);					       \
+	if (cgroup_bpf_enabled) {					       \
+		__ret = __cgroup_bpf_run_filter_sk(sk,			       \
+						 BPF_CGROUP_INET_SOCK_CREATE); \
 	}								       \
 	__ret;								       \
 })
