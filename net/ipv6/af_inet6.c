@@ -284,11 +284,14 @@ out_rcu_unlock:
 int inet6_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
+	const struct proto *prot;
 	int err = 0;
 
+	/* IPV6_ADDRFORM can change sk->sk_prot under us. */
+	prot = READ_ONCE(sk->sk_prot);
 	/* If the socket has its own bind function then use it. */
-	if (sk->sk_prot->bind)
-		return sk->sk_prot->bind(sk, uaddr, addr_len);
+	if (prot->bind)
+		return prot->bind(sk, uaddr, addr_len);
 
 	if (addr_len < SIN6_LEN_RFC2133)
 		return -EINVAL;
@@ -316,22 +319,6 @@ int __inet6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len,
 	bool saved_ipv6only;
 	int addr_type = 0;
 	int err = 0;
-
-	/* IPV6_ADDRFORM can change sk->sk_prot under us. */
-	prot = READ_ONCE(sk->sk_prot);
-	/* If the socket has its own bind function then use it. */
-	if (prot->bind)
-		return prot->bind(sk, uaddr, addr_len);
-
-	if (addr_len < SIN6_LEN_RFC2133)
-		return -EINVAL;
-
-	/* BPF prog is run before any checks are done so that if the prog
-	 * changes context in a wrong way it will be caught.
-	 */
-	err = BPF_CGROUP_RUN_PROG_INET6_BIND(sk, uaddr);
-	if (err)
-		return err;
 
 	if (addr->sin6_family != AF_INET6)
 		return -EAFNOSUPPORT;
@@ -449,20 +436,13 @@ int __inet6_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len,
 		sk->sk_ipv6only = 1;
 
 	/* Make sure we are allowed to bind here. */
-	if (snum || !(inet->bind_address_no_port ||
-		      force_bind_address_no_port)) {
-		if (sk->sk_prot->get_port(sk, snum)) {
-			sk->sk_ipv6only = saved_ipv6only;
-			inet_reset_saddr(sk);
-			err = -EADDRINUSE;
-			goto out;
-		}
-		err = BPF_CGROUP_RUN_PROG_INET6_POST_BIND(sk);
-		if (err) {
-			sk->sk_ipv6only = saved_ipv6only;
-			inet_reset_saddr(sk);
-			goto out;
-		}
+	if ((snum || !(inet->bind_address_no_port ||
+		       force_bind_address_no_port)) &&
+	    sk->sk_prot->get_port(sk, snum)) {
+		sk->sk_ipv6only = saved_ipv6only;
+		inet_reset_saddr(sk);
+		err = -EADDRINUSE;
+		goto out;
 	}
 
 	if (addr_type != IPV6_ADDR_ANY)
