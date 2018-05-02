@@ -87,6 +87,8 @@ obj-$(CONFIG_QRTR)		+= qrtr/
 obj-$(CONFIG_NET_NCSI)		+= ncsi/
 obj-$(CONFIG_RMNET_DATA) += rmnet_data/
 obj-$(CONFIG_RMNET_USB) += rmnet_usb/
+obj-$(CONFIG_XDP_SOCKETS)	+= xdp/
+
 #ifdef OPLUS_FEATURE_WIFI_SLA
 #HuangJunyuan@CONNECTIVITY.WIFI.INTERNET.1197891, 2018/04/10,Add code for appo sla function
 obj-y                   	+= oplus_sla/
