@@ -85,6 +85,12 @@ u64 spec_ctrl_current(void)
 EXPORT_SYMBOL_GPL(spec_ctrl_current);
 
 /*
+ * The vendor and possibly platform specific bits which can be modified in
+ * x86_spec_ctrl_base.
+ */
+static u64 __ro_after_init x86_spec_ctrl_mask = SPEC_CTRL_IBRS;
+
+/*
  * AMD specific MSR info for Speculative Store Bypass control.
  * x86_amd_ls_cfg_ssbd_mask is initialized in identify_boot_cpu().
  */
