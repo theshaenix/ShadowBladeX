@@ -2163,7 +2163,7 @@ static ssize_t srbds_show_state(char *buf)
 
 static ssize_t retbleed_show_state(char *buf)
 {
-	return sprintf(buf, "%s\n", retbleed_strings[retbleed_mitigation]);
+	return sprintf(buf, "Vulnerable\n");
 }
 
 static ssize_t cpu_show_common(struct device *dev, struct device_attribute *attr,
