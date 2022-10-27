@@ -305,7 +305,6 @@ GLOBAL(entry_SYSCALL_64_after_hwframe)
 	 * perf profiles. Nothing jumps here.
 	 */
 syscall_return_via_sysret:
-	IBRS_EXIT
 	POP_REGS pop_rdi=0
 
 	/*
