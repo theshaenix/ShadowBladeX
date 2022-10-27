@@ -262,11 +262,9 @@ static __always_inline void vmexit_fill_RSB(void)
 	unsigned long loops;
 
 	asm volatile (ANNOTATE_NOSPEC_ALTERNATIVE
-		      ALTERNATIVE_2("jmp 910f", "", X86_FEATURE_RSB_VMEXIT,
-				    "jmp 911f", X86_FEATURE_RSB_VMEXIT_LITE)
-		      __stringify(__FILL_RETURN_BUFFER(%0, RSB_CLEAR_LOOPS, %1))
-		      "911:"
-		      __stringify(ISSUE_UNBALANCED_RET_GUARD(%1))
+		      ALTERNATIVE("jmp 910f",
+				  __stringify(__FILL_RETURN_BUFFER(%0, RSB_CLEAR_LOOPS, %1)),
+				  X86_FEATURE_RSB_VMEXIT)
 		      "910:"
 		      : "=r" (loops), ASM_CALL_CONSTRAINT
 		      : : "memory" );
