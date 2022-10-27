@@ -11,7 +11,6 @@
 #include <asm/cpufeatures.h>
 #include <asm/msr-index.h>
 #include <asm/unwind_hints.h>
-#include <asm/percpu.h>
 
 /*
  * Fill the CPU return stack buffer.
@@ -55,16 +54,7 @@
 774:						\
 	add	$(BITS_PER_LONG/8) * 2, sp;	\
 	dec	reg;				\
-	jnz	771b;				\
-	/* barrier for jnz misprediction */	\
-	lfence;
-
-#define ISSUE_UNBALANCED_RET_GUARD(sp)		\
-	call 992f;				\
-	int3;					\
-992:						\
-	add $(BITS_PER_LONG/8), sp;		\
-	lfence;
+	jnz	771b;
 
 #ifdef __ASSEMBLY__
 
@@ -153,6 +143,7 @@
   * monstrosity above, manually.
   */
 .macro FILL_RETURN_BUFFER reg:req nr:req ftr:req
+#ifdef CONFIG_RETPOLINE
 	ALTERNATIVE "jmp .Lskip_rsb_\@", "", \ftr
 	__FILL_RETURN_BUFFER(\reg,\nr,%_ASM_SP)
 .Lskip_rsb_\@:
