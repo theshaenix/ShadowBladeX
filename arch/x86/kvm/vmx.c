@@ -9781,13 +9781,8 @@ u64 __always_inline vmx_spec_ctrl_restore_host(struct vcpu_vmx *vmx)
 
 	/*
 	 * If the guest/host SPEC_CTRL values differ, restore the host value.
-	 *
-	 * For legacy IBRS, the IBRS bit always needs to be written after
-	 * transitioning from a less privileged predictor mode, regardless of
-	 * whether the guest/host values differ.
 	 */
-	if (cpu_feature_enabled(X86_FEATURE_KERNEL_IBRS) ||
-	    guestval != hostval)
+	if (guestval != hostval)
 		native_wrmsrl(MSR_IA32_SPEC_CTRL, hostval);
 
 	barrier_nospec();
@@ -9997,12 +9992,12 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 	 * IMPORTANT: RSB filling and SPEC_CTRL handling must be done before
 	 * the first unbalanced RET after vmexit!
 	 *
-	 * For retpoline or IBRS, RSB filling is needed to prevent poisoned RSB
-	 * entries and (in some cases) RSB underflow.
+	 * For retpoline, RSB filling is needed to prevent poisoned RSB entries
+	 * and (in some cases) RSB underflow.
 	 *
 	 * eIBRS has its own protection against poisoned RSB, so it doesn't
-	 * need the RSB filling sequence.  But it does need to be enabled, and a
-	 * single call to retire, before the first unbalanced RET.
+	 * need the RSB filling sequence.  But it does need to be enabled
+	 * before the first unbalanced RET.
 	 *
 	 * So no RETs before vmx_spec_ctrl_restore_host() below.
 	 */
