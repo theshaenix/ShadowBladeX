@@ -129,12 +129,11 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 }
 EXPORT_SYMBOL(nmi_panic);
 
-#ifdef CONFIG_OPLUS_FEATURE_PANIC_FLUSH
-/* yanwu@TECH.Storage.FS.oF2FS, 2019/09/13, flush device cache in panic if necessary */
-extern int panic_flush_device_cache(int timeout);
-void dumpcpuregs(struct pt_regs *pt_regs);
-extern int get_download_mode(void);
-#endif
+void check_panic_on_warn(const char *origin)
+{
+	if (panic_on_warn)
+		panic("%s: panic_on_warn set ...\n", origin);
+}
 
 /**
  *	panic - halt the system
@@ -580,8 +579,7 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 	if (args)
 		vprintk(args->fmt, args->args);
 
-	if (panic_on_warn)
-		panic("panic_on_warn set ...\n");
+	check_panic_on_warn("kernel");
 
 	print_modules();
 
