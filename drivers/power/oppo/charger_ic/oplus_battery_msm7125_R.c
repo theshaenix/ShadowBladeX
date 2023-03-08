@@ -11990,15 +11990,8 @@ static void oplus_set_otg_switch_status(bool value)
 		return;
 	}
 
-	g_oplus_chip->otg_switch = value;
-
-	if (g_oplus_chip->otg_switch == true)
-		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
-				TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK, 0);
-
-	else
-		rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
-				TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK, EN_SNK_ONLY_BIT);
+	rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
+			TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK, 0);
 
 	if (rc < 0) {
 		chg_err("fail to write pmic register\n");
