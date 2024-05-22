@@ -13558,6 +13558,9 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_CHARGE_FULL:
 		rc = smblib_get_prop_from_bms(chg,
 				POWER_SUPPLY_PROP_CHARGE_FULL, val);
+		if (g_oplus_chip) {
+			val->intval = g_oplus_chip->batt_fcc * 1000;
+		}
 		break;
 
 	case POWER_SUPPLY_PROP_FORCE_RECHARGE:
@@ -13581,7 +13584,7 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
 		if (g_oplus_chip) {
-			val->intval = g_oplus_chip->batt_fcc * 1000;
+			val->intval = g_oplus_chip->batt_capacity_mah * 1000;
 		}
 		break;
 	case POWER_SUPPLY_PROP_TIME_TO_FULL_NOW:
