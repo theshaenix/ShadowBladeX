@@ -11971,7 +11971,7 @@ static void oplus_set_otg_switch_status(bool value)
 		return;
 	}
 
-	g_oplus_chip->ui_otg_switch = value;
+	g_oplus_chip->ui_otg_switch = true;
 	chg = &g_oplus_chip->pmic_spmi.smb5_chip->chg;
 
 	rc = smblib_read(chg, USBIN_BASE + INT_RT_STS_OFFSET, &stat);
@@ -11990,6 +11990,7 @@ static void oplus_set_otg_switch_status(bool value)
 		return;
 	}
 
+	g_oplus_chip->otg_switch = true;
 	rc = smblib_masked_write(chg, TYPE_C_MODE_CFG_REG,
 			TYPEC_POWER_ROLE_CMD_MASK | TYPEC_TRY_MODE_MASK, 0);
 
@@ -17738,6 +17739,7 @@ static int smb5_probe(struct platform_device *pdev)
 	/* lizhijie@BSP.CHG.Basic, 2020/02/25, lzj Add for charging*/
 	oplus_chg_parse_custom_dt(oplus_chip);
 	oplus_chg_init(oplus_chip);
+	oplus_set_otg_switch_status(true);
 	schedule_delayed_work(&chg->regist_pd, 0);
 #ifdef VENDOR_EDIT
 //Gang.Yan add for usbtemp
@@ -17832,7 +17834,6 @@ static int smb5_probe(struct platform_device *pdev)
 	device_init_wakeup(chg->dev, true);
 
 	pr_info("QPNP SMB5 probed successfully\n");
-
 	return rc;
 
 free_irq:
