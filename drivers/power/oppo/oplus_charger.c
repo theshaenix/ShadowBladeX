@@ -293,6 +293,39 @@ int oplus_usb_property_is_writeable(struct power_supply *psy,
 	return 0;
 }
 
+void __attribute__((weak)) oplus_set_otg_switch_status(bool value)
+{
+	return;
+}
+
+int oplus_usb_set_property(struct power_supply *psy,
+		enum power_supply_property psp,
+		const union power_supply_propval *val)
+{
+	int ret = 0;
+	//struct oplus_chg_chip *chip = container_of(psy->desc, struct oplus_chg_chip, usb_psd);
+	struct oplus_chg_chip *chip = g_charger_chip;
+
+	switch (psp) {
+		case POWER_SUPPLY_PROP_OTG_SWITCH:
+			if (val->intval == 1) {
+				chip->otg_switch = true;
+				oplus_set_otg_switch_status(true);
+			} else {
+				chip->otg_switch = false;
+				chip->otg_online = false;
+				oplus_set_otg_switch_status(false);
+			}
+			charger_xlog_printk(CHG_LOG_CRTI, "otg_switch: %d\n", chip->otg_switch);
+			break;
+		default:
+			pr_err("set prop %d is not supported in usb\n", psp);
+			ret = -EINVAL;
+			break;
+	}
+	return ret;
+}
+
 static void usb_update(struct oplus_chg_chip *chip)
 {
 	if (chip->charger_exist) {
@@ -308,11 +341,6 @@ static void usb_update(struct oplus_chg_chip *chip)
 	power_supply_changed(chip->usb_psy);
 }
 #endif
-
-void __attribute__((weak)) oplus_set_otg_switch_status(bool value)
-{
-	return;
-}
 
 int oplus_ac_get_property(struct power_supply *psy,
 		enum power_supply_property psp,
@@ -5254,8 +5282,6 @@ static void oplus_chg_variables_init(struct oplus_chg_chip *chip)
 	chip->boot_completed = false;
 	chip->pd_chging = false;
 	chip->pd_svooc = false;
-
-	oplus_set_otg_switch_status(true);
 }
 
 static void oplus_chg_fail_action(struct oplus_chg_chip *chip)
