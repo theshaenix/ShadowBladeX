@@ -303,6 +303,13 @@ int of_irq_parse_one(struct device_node *device, int index, struct of_phandle_ar
 		return of_irq_parse_oldworld(device, index, out_irq);
 
 	/* Get the reg property (if any) */
+	addr = of_get_property(device, "reg", &addr_len);
+
+	/* Prevent out-of-bounds read in case of longer interrupt parent address size */
+	if (addr_len > sizeof(addr_buf))
+		addr_len = sizeof(addr_buf);
+	if (addr)
+		memcpy(addr_buf, addr, addr_len);
 	addr = of_get_property(device, "reg", NULL);
 
 	/* Try the new-style interrupts-extended first */
