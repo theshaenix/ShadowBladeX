@@ -1056,3 +1056,6 @@ CONFIG_KSU=y
 
 # Enable WPA3 personal
 CONFIG_SAE=y
+
+# Dynamic FSYNC
+CONFIG_DYNAMIC_FSYNC=y
