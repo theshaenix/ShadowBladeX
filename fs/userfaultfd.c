@@ -1759,9 +1759,7 @@ static int userfaultfd_copy(struct userfaultfd_ctx *ctx,
 	ret = -EINVAL;
 	if (uffdio_copy.src + uffdio_copy.len <= uffdio_copy.src)
 		goto out;
-	if (uffdio_copy.mode & ~(UFFDIO_COPY_MODE_DONTWAKE|
-				 UFFDIO_COPY_MODE_WP|
-				 UFFDIO_COPY_MODE_MMAP_TRYLOCK))
+	if (uffdio_copy.mode & ~(UFFDIO_COPY_MODE_DONTWAKE|UFFDIO_COPY_MODE_WP))
 		goto out;
 	if (mmget_not_zero(ctx->mm)) {
 		ret = mcopy_atomic(ctx->mm, uffdio_copy.dst, uffdio_copy.src,
@@ -1812,14 +1810,13 @@ static int userfaultfd_zeropage(struct userfaultfd_ctx *ctx,
 	if (ret)
 		goto out;
 	ret = -EINVAL;
-	if (uffdio_zeropage.mode & ~(UFFDIO_ZEROPAGE_MODE_DONTWAKE|
-				     UFFDIO_ZEROPAGE_MODE_MMAP_TRYLOCK))
+	if (uffdio_zeropage.mode & ~UFFDIO_ZEROPAGE_MODE_DONTWAKE)
 		goto out;
 
 	if (mmget_not_zero(ctx->mm)) {
 		ret = mfill_zeropage(ctx->mm, uffdio_zeropage.range.start,
 				     uffdio_zeropage.range.len,
-				     &ctx->mmap_changing, uffdio_zeropage.mode);
+				     &ctx->mmap_changing);
 		mmput(ctx->mm);
 	} else {
 		return -ESRCH;
