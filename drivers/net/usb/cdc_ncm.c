@@ -1501,19 +1501,9 @@ int cdc_ncm_rx_fixup(struct usbnet *dev, struct sk_buff *skb_in)
 {
 	struct sk_buff *skb;
 	struct cdc_ncm_ctx *ctx = (struct cdc_ncm_ctx *)dev->data[0];
-	unsigned int len;
+	int len;
 	int nframes;
 	int x;
-	unsigned int offset;
-	union {
-		struct usb_cdc_ncm_ndp16 *ndp16;
-		struct usb_cdc_ncm_ndp32 *ndp32;
-	} ndp;
-	union {
-		struct usb_cdc_ncm_dpe16 *dpe16;
-		struct usb_cdc_ncm_dpe32 *dpe32;
-	} dpe;
-
 	int offset;
 	struct usb_cdc_ncm_ndp16 *ndp16;
 	struct usb_cdc_ncm_dpe16 *dpe16;
@@ -1554,8 +1544,8 @@ next_ndp:
 			break;
 		}
 
-		/* sanity checking - watch out for integer wrap*/
-		if ((offset > skb_in->len) || (len > skb_in->len - offset) ||
+		/* sanity checking */
+		if (((offset + len) > skb_in->len) ||
 				(len > ctx->rx_max) || (len < ETH_HLEN)) {
 			netif_dbg(dev, rx_err, dev->net,
 				  "invalid frame detected (ignored) offset[%u]=%u, length=%u, skb=%p\n",
