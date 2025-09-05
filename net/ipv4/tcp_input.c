@@ -2713,9 +2713,6 @@ void tcp_enter_recovery(struct sock *sk, bool ece_ack)
 	struct tcp_sock *tp = tcp_sk(sk);
 	int mib_idx;
 
-	/* Start the clock with our fast retransmit, for undo and ETIMEDOUT. */
-	tcp_retrans_stamp_cleanup(sk);
-
 	if (tcp_is_reno(tp))
 		mib_idx = LINUX_MIB_TCPRENORECOVERY;
 	else
