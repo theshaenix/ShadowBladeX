@@ -146,6 +146,7 @@ static int six_hundred_forty_kb = 640 * 1024;
 static int two_hundred_fifty_five = 255;
 
 #ifdef CONFIG_SCHED_BORE
+extern uint sched_burst_exclude_kthreads;
 extern uint sched_burst_smoothness_long;
 extern uint sched_burst_smoothness_short;
 extern uint sched_burst_fork_atavistic;
@@ -787,6 +788,15 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &two_hundred_fifty_five,
 	},
 #ifdef CONFIG_SCHED_BORE
+	{
+		.procname	= "sched_burst_exclude_kthreads",
+		.data		= &sched_burst_exclude_kthreads,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler = proc_douintvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
 	{
 		.procname	= "sched_burst_smoothness_long",
 		.data		= &sched_burst_smoothness_long,
