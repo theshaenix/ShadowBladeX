@@ -2,10 +2,10 @@
 
 # Kernel build configuration
 KERNEL_NAME="ShadowBladeX"
-DEVICE="RMX2061"
+DEVICE="reatoll"
 VARIANT="perf"
 BUILD_TYPE="Stable"
-VERSION_NUMBER="v1.0.1"
+VERSION_NUMBER="v1.0.2"
 
 DATE=$(date +%Y%m%d)
 BASE_ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${DATE}-${VERSION_NUMBER}"
