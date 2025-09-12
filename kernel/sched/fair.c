@@ -958,6 +958,8 @@ static inline u64 scale_slice(u64 delta, struct sched_entity *se) {
 	return mul_u64_u32_shr(delta, sched_prio_to_wmult[se->burst_score], 22);
 }
 
+void reweight_task(struct task_struct *p, int prio);
+
 static void update_burst_score(struct sched_entity *se) {
 	struct task_struct *p;
 	s32 prio, prev_prio, new_prio;
@@ -3078,6 +3080,17 @@ static inline int per_task_boost(struct task_struct *p)
 		}
 	}
 	return p->boost;
+}
+
+void reweight_task(struct task_struct *p, int prio)
+{
+    struct sched_entity *se = &p->se;
+    struct cfs_rq *cfs_rq = cfs_rq_of(se);
+    struct load_weight *load = &se->load;
+    unsigned long weight = scale_load(sched_prio_to_weight[prio]);
+
+    reweight_entity(cfs_rq, se, weight);
+    load->inv_weight = sched_prio_to_wmult[prio];
 }
 
 #ifdef CONFIG_SMP
