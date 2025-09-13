@@ -4,7 +4,7 @@
 KERNEL_NAME="ShadowBladeX"
 DEVICE="reatoll"
 VARIANT="perf"
-BUILD_TYPE="Stable"
+BUILD_TYPE="nonKSU"
 VERSION_NUMBER="v1.0.2"
 
 DATE=$(date +%Y%m%d)
