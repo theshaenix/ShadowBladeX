@@ -34,6 +34,18 @@
 #include <linux/sched/task_stack.h>
 #endif
 
+/* Compatibility for kernels missing timer_setup APIs (like 4.14 CAF) */
+#ifndef timer_setup_on_stack
+static inline void timer_setup_on_stack(struct timer_list *timer,
+                                        void (*callback)(struct timer_list *),
+                                        unsigned int flags)
+{
+    init_timer_on_stack(timer);
+    timer->function = (void (*)(unsigned long))callback;
+    timer->data = (unsigned long)timer;
+    timer->flags = flags;
+}
+#endif
 typedef void (*qdf_timer_func_t)(void *);
 
 
