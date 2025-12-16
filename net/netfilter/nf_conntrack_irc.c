@@ -278,42 +278,128 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 	data = ib_ptr;
 	data_limit = ib_ptr + skb->len - dataoff;
 
-	/* Skip any whitespace */
-	while (data < data_limit - 10) {
-		if (*data == ' ' || *data == '\r' || *data == '\n')
-			data++;
-		else
-			break;
-	}
-
-	/* strlen("PRIVMSG x ")=10 */
-	if (data < data_limit - 10) {
-		if (strncasecmp("PRIVMSG ", data, 8))
-			goto out;
-		data += 8;
-	}
-
-	/* strlen(" :\1DCC SENT t AAAAAAAA P\1\n")=26
-	 * 7+MINMATCHLEN+strlen("t AAAAAAAA P\1\n")=26
+	/* If packet is coming from IRC server
+	 * parse the packet for different type of
+	 * messages (MOTD,NICK etc) and process
+	 * accordingly
 	 */
-	while (data < data_limit - (21 + MINMATCHLEN)) {
-		/* Find first " :", the start of message */
-		if (memcmp(data, " :", 2)) {
-			data++;
-			continue;
-		}
-		data += 2;
+	if (dir == IP_CT_DIR_REPLY) {
+		/* strlen("NICK xxxxxx")
+		 * 5+strlen("xxxxxx")=1 (minimum length of nickname)
+		 */
 
-		/* then check that place only for the DCC command */
-		if (memcmp(data, "\1DCC ", 5))
+		while (data < data_limit - 6) {
+			if (memcmp(data, " MOTD ", 6)) {
+				data++;
+				continue;
+			}
+			/* MOTD message signifies successful
+			 * registration with server
+			 */
+			tuple = &ct->tuplehash[!dir].tuple;
+			temp = search_client_by_ip(tuple);
+			if (temp && !temp->conn_to_server)
+				temp->conn_to_server = true;
+			ret = NF_ACCEPT;
 			goto out;
-		data += 5;
-		/* we have at least (21+MINMATCHLEN)-(2+5) bytes valid data left */
+		}
 
-		iph = ip_hdr(skb);
-		pr_debug("DCC found in master %pI4:%u %pI4:%u\n",
-			 &iph->saddr, ntohs(th->source),
-			 &iph->daddr, ntohs(th->dest));
+		/* strlen("NICK :xxxxxx")
+		 * 6+strlen("xxxxxx")=1 (minimum length of nickname)
+		 * Parsing the server reply to get nickname
+		 * of the client
+		 */
+		data = ib_ptr;
+		data_limit = ib_ptr + skb->len - dataoff;
+		while (data < data_limit - (6 + MINLENNICK)) {
+			if (memcmp(data, "NICK :", 6)) {
+				data++;
+				continue;
+			}
+			data += 6;
+			nick_end = data;
+			i = 0;
+			while ((*nick_end != 0x0d) &&
+			       (*(nick_end + 1) != '\n')) {
+				nick_end++;
+				i++;
+			}
+			tuple = &ct->tuplehash[!dir].tuple;
+			temp = search_client_by_ip(tuple);
+			if (temp && temp->nickname) {
+				kfree(temp->nickname);
+				temp->nickname = kmalloc(i, GFP_ATOMIC);
+				if (temp->nickname) {
+					temp->nickname_len = i;
+					memcpy(temp->nickname, data,
+					       temp->nickname_len);
+					temp->conn_to_server = true;
+				} else {
+					list_del(&temp->ptr);
+					no_of_clients--;
+					kfree(temp);
+					ret = NF_ACCEPT;
+				}
+			}
+			/*NICK during registration*/
+			ret = NF_ACCEPT;
+			goto out;
+		}
+	}
+
+	else{
+		/*Parsing NICK command from client to create an entry
+		 * strlen("NICK xxxxxx")
+		 * 5+strlen("xxxxxx")=1 (minimum length of nickname)
+		 */
+		data = ib_ptr;
+		data_limit = ib_ptr + skb->len - dataoff;
+		while (data < data_limit - (5 + MINLENNICK)) {
+			if (memcmp(data, "NICK ", 5)) {
+				data++;
+				continue;
+			}
+			data += 5;
+			ret = handle_nickname(ct, dir, data);
+			goto out;
+		}
+
+		data = ib_ptr;
+		while (data < data_limit - 6) {
+			if (memcmp(data, "QUIT :", 6)) {
+				data++;
+				continue;
+			}
+			/* Parsing QUIT to free the list entry
+			 */
+			tuple = &ct->tuplehash[dir].tuple;
+			temp = search_client_by_ip(tuple);
+			if (temp) {
+				list_del(&temp->ptr);
+				no_of_clients--;
+				kfree(temp->nickname);
+				kfree(temp);
+			}
+			ret = NF_ACCEPT;
+			goto out;
+		}
+		/* strlen("\1DCC SENT t AAAAAAAA P\1\n")=24
+		 * 5+MINMATCHLEN+strlen("t AAAAAAAA P\1\n")=14
+		 */
+		data = ib_ptr;
+		while (data < data_limit - (19 + MINMATCHLEN)) {
+			if (memcmp(data, "\1DCC ", 5)) {
+				data++;
+				continue;
+			}
+			data += 5;
+			/* we have at least (19+MINMATCHLEN)-5
+			 *bytes valid data left
+			 */
+			iph = ip_hdr(skb);
+			pr_debug("DCC found in master %pI4:%u %pI4:%u\n",
+				 &iph->saddr, ntohs(th->source),
+				 &iph->daddr, ntohs(th->dest));
 
 			for (i = 0; i < ARRAY_SIZE(dccprotos); i++) {
 				if (memcmp(data, dccprotos[i],
@@ -324,14 +410,16 @@ static int help(struct sk_buff *skb, unsigned int protoff,
 				data += strlen(dccprotos[i]);
 				pr_debug("DCC %s detected\n", dccprotos[i]);
 
-			/* we have at least
-			 * (21+MINMATCHLEN)-7-dccprotos[i].matchlen bytes valid
-			 * data left (== 14/13 bytes) */
-			if (parse_dcc(data, data_limit, &dcc_ip,
-				       &dcc_port, &addr_beg_p, &addr_end_p)) {
-				pr_debug("unable to parse dcc command\n");
-				continue;
-			}
+				/* we have at least
+				 * (19+MINMATCHLEN)-5-dccprotos[i].matchlen
+				 *bytes valid data left (== 14/13 bytes)
+				 */
+				if (parse_dcc(data, data_limit, &dcc_ip,
+					      &dcc_port, &addr_beg_p,
+					      &addr_end_p)) {
+					pr_debug("unable to parse dcc command\n");
+					continue;
+				}
 
 				pr_debug("DCC bound ip/port: %pI4:%u\n",
 					 &dcc_ip, dcc_port);
