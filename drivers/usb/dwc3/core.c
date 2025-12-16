@@ -725,10 +725,12 @@ static void dwc3_core_exit(struct dwc3 *dwc)
 	phy_power_off(dwc->usb2_generic_phy);
 	phy_power_off(dwc->usb3_generic_phy);
 
-	usb_phy_shutdown(dwc->usb2_phy);
-	usb_phy_shutdown(dwc->usb3_phy);
-	phy_exit(dwc->usb2_generic_phy);
-	phy_exit(dwc->usb3_generic_phy);
+        usb_phy_shutdown(dwc->usb2_phy1);
+        usb_phy_shutdown(dwc->usb2_phy);
+        usb_phy_shutdown(dwc->usb3_phy1);
+        usb_phy_shutdown(dwc->usb3_phy);
+        phy_exit(dwc->usb2_generic_phy);
+        phy_exit(dwc->usb3_generic_phy);
 }
 
 static bool dwc3_core_is_valid(struct dwc3 *dwc)
