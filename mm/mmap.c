@@ -2324,10 +2324,12 @@ arch_get_unmapped_area_topdown(struct file *filp, const unsigned long addr0,
 	} else {
 		info.high_limit = mm->mmap_base;
 		info.align_mask = 0;
+		info.align_offset = 0;
 	}
 #else
 	info.high_limit = mm->mmap_base;
 	info.align_mask = 0;
+	info.align_offset = 0;
 #endif
 	addr = vm_unmapped_area(&info);
 
