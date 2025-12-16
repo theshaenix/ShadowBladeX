@@ -2923,6 +2923,7 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 	struct tcp_sock *tp = tcp_sk(sk);
 	unsigned int cur_mss;
 	int diff, len, err;
+        int avail_wnd;
 #ifdef OPLUS_FEATURE_MODEM_DATA_NWPOWER
         /*
         *Ruansong@PSW.NW.DATA.213100, 2020/06/01
