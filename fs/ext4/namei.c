@@ -1584,11 +1584,10 @@ static struct buffer_head *__ext4_find_entry(struct inode *dir,
 			*inlined = has_inline_data;
 		if (has_inline_data)
 			goto cleanup_and_exit;
-		}
+		
 	}
 
-	if ((namelen <= 2) && (name[0] == '.') &&
-	    (name[1] == '.' || name[1] == '\0')) {
+	if ((namelen <= 2) && (name[0] == '.') && (name[1] == '.' || name[1] == '\0')) {
 		/*
 		 * "." or ".." will only be in the first block
 		 * NFS may look up ".."; "." should be handled by the VFS
