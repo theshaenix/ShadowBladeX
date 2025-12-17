@@ -326,17 +326,17 @@ static struct ext4_dir_entry_tail *get_dirent_tail(struct inode *inode,
 						   struct ext4_dir_entry *de)
 {
 	struct ext4_dir_entry_tail *t;
-	int blocksize = EXT4_BLOCK_SIZE(inode->i_sb);
 
 #ifdef PARANOID
 	struct ext4_dir_entry *d, *top;
 
 	d = de;
 	top = (struct ext4_dir_entry *)(((void *)de) +
-		(blocksize - sizeof(struct ext4_dir_entry_tail)));
-	while (d < top && ext4_rec_len_from_disk(d->rec_len, blocksize))
+		(EXT4_BLOCK_SIZE(inode->i_sb) -
+		sizeof(struct ext4_dir_entry_tail)));
+	while (d < top && d->rec_len)
 		d = (struct ext4_dir_entry *)(((void *)d) +
-		    ext4_rec_len_from_disk(d->rec_len, blocksize));
+		    le16_to_cpu(d->rec_len));
 
 	if (d != top)
 		return NULL;
@@ -347,8 +347,7 @@ static struct ext4_dir_entry_tail *get_dirent_tail(struct inode *inode,
 #endif
 
 	if (t->det_reserved_zero1 ||
-	    (ext4_rec_len_from_disk(t->det_rec_len, blocksize) !=
-	     sizeof(struct ext4_dir_entry_tail)) ||
+	    le16_to_cpu(t->det_rec_len) != sizeof(struct ext4_dir_entry_tail) ||
 	    t->det_reserved_zero2 ||
 	    t->det_reserved_ft != EXT4_FT_DIR_CSUM)
 		return NULL;
@@ -430,14 +429,13 @@ static struct dx_countlimit *get_dx_countlimit(struct inode *inode,
 	struct ext4_dir_entry *dp;
 	struct dx_root_info *root;
 	int count_offset;
-	int blocksize = EXT4_BLOCK_SIZE(inode->i_sb);
-	unsigned int rlen = ext4_rec_len_from_disk(dirent->rec_len, blocksize);
 
-	if (rlen == blocksize)
+	if (le16_to_cpu(dirent->rec_len) == EXT4_BLOCK_SIZE(inode->i_sb))
 		count_offset = 8;
-	else if (rlen == 12) {
+	else if (le16_to_cpu(dirent->rec_len) == 12) {
 		dp = (struct ext4_dir_entry *)(((void *)dirent) + 12);
-		if (ext4_rec_len_from_disk(dp->rec_len, blocksize) != blocksize - 12)
+		if (le16_to_cpu(dp->rec_len) !=
+		    EXT4_BLOCK_SIZE(inode->i_sb) - 12)
 			return NULL;
 		root = (struct dx_root_info *)(((void *)dp + 12));
 		if (root->reserved_zero ||
@@ -1287,15 +1285,8 @@ static int dx_make_map(struct inode *dir, struct ext4_dir_entry_2 *de,
 	int count = 0;
 	char *base = (char *) de;
 	struct dx_hash_info h = *hinfo;
-	int blocksize = EXT4_BLOCK_SIZE(dir->i_sb);
 
-	if (ext4_has_metadata_csum(dir->i_sb))
-		buflen -= sizeof(struct ext4_dir_entry_tail);
-
-	while ((char *) de < base + buflen) {
-		if (ext4_check_dir_entry(dir, NULL, de, bh, base, buflen,
-					 ((char *)de) - base))
-			return -EFSCORRUPTED;
+	while ((char *) de < base + blocksize) {
 		if (de->name_len && de->inode) {
 			if (ext4_hash_in_dirent(dir))
 				h.hash = EXT4_DIRENT_HASH(de);
@@ -1304,11 +1295,11 @@ static int dx_make_map(struct inode *dir, struct ext4_dir_entry_2 *de,
 			map_tail--;
 			map_tail->hash = h.hash;
 			map_tail->offs = ((char *) de - base)>>2;
-			map_tail->size = ext4_rec_len_from_disk(de->rec_len,
-								blocksize);
+			map_tail->size = le16_to_cpu(de->rec_len);
 			count++;
 			cond_resched();
 		}
+		/* XXX: do we need to check rec_len == 0 case? -Chris */
 		de = ext4_next_entry(de, blocksize);
 	}
 	return count;
