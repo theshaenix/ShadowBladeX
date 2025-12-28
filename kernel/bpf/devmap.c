@@ -61,11 +61,12 @@ struct xdp_bulk_queue {
 };
 
 struct bpf_dtab_netdev {
-	struct net_device *dev; /* must be first member, due to tracepoint */
-	struct bpf_dtab *dtab;
-	unsigned int bit;
-	struct xdp_bulk_queue __percpu *bulkq;
-	struct rcu_head rcu;
+        struct net_device *dev; /* must be first member, due to tracepoint */
+        struct hlist_node index_hlist;
+        struct bpf_dtab *dtab;
+        struct xdp_bulk_queue __percpu *bulkq;
+        struct rcu_head rcu;
+        unsigned int idx; /* keep track of map index for tracepoint */
 };
 
 struct bpf_dtab {
