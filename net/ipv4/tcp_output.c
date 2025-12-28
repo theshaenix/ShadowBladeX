@@ -62,6 +62,22 @@ int sysctl_tcp_tso_win_divisor __read_mostly = 3;
 /* By default, RFC2861 behavior.  */
 int sysctl_tcp_slow_start_after_idle __read_mostly = 1;
 
+#ifdef OPLUS_FEATURE_MODEM_DATA_NWPOWER
+/*
+*Ruansong@PSW.NW.DATA.212800, 2020/06/01
+*Add for classify glink wakeup services
+*/
+#include <net/oplus_nwpower.h>
+extern atomic_t oplus_tcp_is_input;
+extern atomic_t ipa_wakeup_hook_boot;
+extern struct timespec oplus_tcp_last_transmission_stamp;
+extern struct work_struct oplus_tcp_output_hook_work;
+extern struct oplus_tcp_hook_struct oplus_tcp_output_hook;
+extern atomic_t tcpsynretrans_hook_boot;
+extern struct work_struct oplus_tcp_output_tcpsynretrans_hook_work;
+extern struct oplus_tcp_hook_struct oplus_tcp_output_tcpsynretrans_hook;
+#endif /* OPLUS_FEATURE_MODEM_DATA_NWPOWER */
+
 /* Refresh clocks of a TCP socket,
  * ensuring monotically increasing values.
  */
