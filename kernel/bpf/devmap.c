@@ -691,12 +691,13 @@ const struct bpf_map_ops dev_map_ops = {
 };
 
 const struct bpf_map_ops dev_map_hash_ops = {
-	.map_alloc = dev_map_alloc,
-	.map_free = dev_map_free,
-	.map_get_next_key = dev_map_hash_get_next_key,
-	.map_lookup_elem = dev_map_hash_lookup_elem,
-	.map_update_elem = dev_map_hash_update_elem,
-	.map_delete_elem = dev_map_hash_delete_elem,
+        .map_alloc = dev_map_alloc,
+        .map_free = dev_map_free,
+        .map_get_next_key = dev_map_hash_get_next_key,
+        .map_lookup_elem = dev_map_hash_lookup_elem,
+        .map_update_elem = dev_map_hash_update_elem,
+        .map_delete_elem = dev_map_hash_delete_elem,
+        .map_check_btf = map_check_no_btf,
 };
 
 static int dev_map_notification(struct notifier_block *notifier,
