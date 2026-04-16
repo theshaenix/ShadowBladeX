@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - mcqueen
       - "copilot/**"
   pull_request:
   workflow_dispatch:
