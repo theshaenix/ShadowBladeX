@@ -1073,7 +1073,7 @@ int susfs_open_redirect_spoof_show_map_vma(struct inode *inode, unsigned long *o
 		{
 			spoofed_name = kzalloc(SUSFS_MAX_LEN_PATHNAME, GFP_KERNEL);
 			if (!spoofed_name) {
-				SUSFS_LOGE("no enough memeory\n");
+				SUSFS_LOGE("no enough memory\n");
 				srcu_read_unlock(&susfs_srcu_open_redirect, srcu_idx);
 				return -ENOMEM;
 			}
@@ -1463,4 +1463,3 @@ void susfs_init(void) {
 
 /* No module exit is needed becuase it should never be a loadable kernel module */
 //void __init susfs_exit(void)
-
