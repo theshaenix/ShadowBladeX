@@ -3,7 +3,6 @@
 #include <linux/idr.h>
 #include <linux/slab.h>
 #include <linux/spinlock.h>
-#include <linux/xarray.h>
 
 DEFINE_PER_CPU(struct ida_bitmap *, ida_bitmap);
 
@@ -424,14 +423,14 @@ void ida_destroy(struct ida *ida)
 	struct radix_tree_iter iter;
 	void __rcu **slot;
 
-	xa_lock_irqsave(&ida->ida_rt, flags);
+	spin_lock_irqsave(&ida->lock, flags);
 	radix_tree_for_each_slot(slot, &ida->ida_rt, &iter, 0) {
 		struct ida_bitmap *bitmap = rcu_dereference_raw(*slot);
 		if (!radix_tree_exception(bitmap))
 			kfree(bitmap);
 		radix_tree_iter_delete(&ida->ida_rt, &iter, slot);
 	}
-	xa_unlock_irqrestore(&ida->ida_rt, flags);
+	spin_unlock_irqrestore(&ida->lock, flags);
 }
 EXPORT_SYMBOL(ida_destroy);
 
@@ -462,7 +461,7 @@ int ida_alloc_range(struct ida *ida, unsigned int min, unsigned int max,
 		max = INT_MAX;
 
 again:
-	xa_lock_irqsave(&ida->ida_rt, flags);
+	spin_lock_irqsave(&ida->lock, flags);
 	ret = ida_get_new_above(ida, min, &id);
 	if (!ret) {
 		if (id > max) {
@@ -472,7 +471,7 @@ again:
 			ret = id;
 		}
 	}
-	xa_unlock_irqrestore(&ida->ida_rt, flags);
+	spin_unlock_irqrestore(&ida->lock, flags);
 
 	if (unlikely(ret == -EAGAIN)) {
 		if (!ida_pre_get(ida, gfp))
@@ -498,8 +497,8 @@ void ida_free(struct ida *ida, unsigned int id)
 	if ((int)id < 0)
 		return;
 
-	xa_lock_irqsave(&ida->ida_rt, flags);
+	spin_lock_irqsave(&ida->lock, flags);
 	ida_remove(ida, id);
-	xa_unlock_irqrestore(&ida->ida_rt, flags);
+	spin_unlock_irqrestore(&ida->lock, flags);
 }
 EXPORT_SYMBOL(ida_free);

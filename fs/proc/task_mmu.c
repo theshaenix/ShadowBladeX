@@ -83,7 +83,7 @@ void task_mem(struct seq_file *m, struct mm_struct *mm)
 	seq_put_decimal_ull_width(m,
 		    " kB\nVmLib:\t", lib >> 10, 8);
 	seq_put_decimal_ull_width(m,
-		    " kB\nVmPTE:\t", mm_pgtables_bytes(mm) >> 10, 8);
+		    " kB\nVmPTE:\t", ptes >> 10, 8);
 	seq_put_decimal_ull_width(m,
 		    " kB\nVmPMD:\t", pmds >> 10, 8);
 	SEQ_PUT_DEC(" kB\nVmSwap:\t", swap);
