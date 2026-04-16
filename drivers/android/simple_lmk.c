@@ -24,6 +24,7 @@
 /*
  * Keep swap with the same budget as reclaim minfree: if either RAM or swap
  * still has this much headroom, we can postpone killing user processes.
+ * The unit is pages.
  */
 #define SWAP_HEADROOM_PAGES MIN_FREE_PAGES
 
@@ -52,8 +53,11 @@ static atomic_t needs_reap = ATOMIC_INIT(0);
 static atomic_t nr_killed = ATOMIC_INIT(0);
 
 /*
- * Avoid reclaim kills while there is still comfortable headroom.
- * MIN_FREE_PAGES is the RAM budget and SWAP_HEADROOM_PAGES is the swap budget.
+ * should_reclaim() - decide if process killing reclaim should be triggered
+ * @pressure: vmpressure event level (0-100)
+ *
+ * Return: true only when pressure is critical and both RAM and swap headroom
+ * are below their configured page-based budgets.
  */
 static bool should_reclaim(unsigned long pressure)
 {
