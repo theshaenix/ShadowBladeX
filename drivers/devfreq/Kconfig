@@ -92,7 +92,7 @@ config QCOM_BIMC_BWMON
 
 config ARM_MEMLAT_MON
 	tristate "ARM CPU Memory Latency monitor hardware"
-	depends on ARCH_QCOM
+	depends on ARCH_QCOM && PERF_EVENTS
 	help
 	  The PMU present on these ARM cores allow for the use of counters to
 	  monitor the memory latency characteristics of an ARM CPU workload.
