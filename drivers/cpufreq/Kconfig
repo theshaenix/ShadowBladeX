@@ -246,6 +246,23 @@ config SCHEDUTIL_DOWN_RATE_LIMIT
 	  This sets schedutil's default frequency down rate-limit in
 	  microseconds.
 
+config SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ
+	int "Max iowait-boost frequency for LP (little) cluster CPUs (kHz)"
+	default 0
+	help
+	  Cap the iowait-boost ceiling for CPUs whose capacity is below the
+	  architectural maximum (i.e. the little/LP cluster on big.LITTLE
+	  systems).  When a CPU task wakes from IO-wait, schedutil doubles the
+	  iowait_boost up to iowait_boost_max; setting this below the LP
+	  cluster's max_freq prevents the little cores from being pinned at
+	  their maximum frequency purely due to IO activity.
+
+	  Set to 0 (default) to disable the cap and use the policy max_freq
+	  as the ceiling, which preserves the original behaviour.
+
+	  For the Snapdragon 720G (atoll) little cluster (Cortex-A55), a
+	  value of 1209600 (~67 % of max) is a reasonable starting point.
+
 endif
 
 config FREQVAR_TUNE

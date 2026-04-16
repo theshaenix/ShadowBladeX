@@ -14,11 +14,19 @@
 #include <linux/ratelimit.h>
 #include <linux/sched/mm.h>
 #include <linux/sort.h>
+#include <linux/swap.h>
 #include <linux/vmpressure.h>
 #include <uapi/linux/sched/types.h>
 
 /* The minimum number of pages to free per reclaim */
 #define MIN_FREE_PAGES (CONFIG_ANDROID_SIMPLE_LMK_MINFREE * SZ_1M / PAGE_SIZE)
+
+/*
+ * Keep swap with the same budget as reclaim minfree: if either RAM or swap
+ * still has this much headroom, we can postpone killing user processes.
+ * The unit is pages.
+ */
+#define SWAP_HEADROOM_PAGES MIN_FREE_PAGES
 
 /* Kill up to this many victims per reclaim */
 #define MAX_VICTIMS 1024
@@ -43,6 +51,27 @@ static bool reclaim_active;
 static atomic_t needs_reclaim = ATOMIC_INIT(0);
 static atomic_t needs_reap = ATOMIC_INIT(0);
 static atomic_t nr_killed = ATOMIC_INIT(0);
+
+/*
+ * should_reclaim() - decide if process killing reclaim should be triggered
+ * @pressure: vmpressure event level (0-100)
+ *
+ * Return: true only when pressure is critical and both RAM and swap headroom
+ * are below their configured page-based budgets.
+ */
+static bool should_reclaim(unsigned long pressure)
+{
+	if (pressure != 100)
+		return false;
+
+	if (si_mem_available() > MIN_FREE_PAGES)
+		return false;
+
+	if (get_nr_swap_pages() > SWAP_HEADROOM_PAGES)
+		return false;
+
+	return true;
+}
 
 static int victim_cmp(const void *lhs_ptr, const void *rhs_ptr)
 {
@@ -464,7 +493,7 @@ void simple_lmk_mm_freed(struct mm_struct *mm)
 static int simple_lmk_vmpressure_cb(struct notifier_block *nb,
 				    unsigned long pressure, void *data)
 {
-	if (pressure == 100) {
+	if (should_reclaim(pressure)) {
 		atomic_set(&needs_reclaim, 1);
 		smp_mb__after_atomic();
 		if (waitqueue_active(&oom_waitq))
