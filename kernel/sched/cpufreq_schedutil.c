@@ -1051,7 +1051,22 @@ static int sugov_start(struct cpufreq_policy *policy)
 		sg_cpu->cpu = cpu;
 		sg_cpu->sg_policy = sg_policy;
 		sg_cpu->flags = SCHED_CPUFREQ_RT;
+		/*
+		 * Cap iowait_boost for LP (little) cluster CPUs so that
+		 * frequent Android IO does not pin little cores at their
+		 * maximum frequency.  A CPU is considered LP if its
+		 * capacity is below SCHED_CAPACITY_SCALE (the canonical
+		 * mark for the largest core in the system).
+		 */
+#if CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ
+		if (arch_scale_cpu_capacity(NULL, cpu) < SCHED_CAPACITY_SCALE)
+			sg_cpu->iowait_boost_max =
+				CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ;
+		else
+			sg_cpu->iowait_boost_max = policy->cpuinfo.max_freq;
+#else
 		sg_cpu->iowait_boost_max = policy->cpuinfo.max_freq;
+#endif
 	}
 
 	for_each_cpu(cpu, policy->cpus) {
