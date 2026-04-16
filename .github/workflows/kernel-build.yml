@@ -72,7 +72,8 @@ jobs:
       - name: Upload to Telegram
         if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
-          CAPTION=$'Kernel build: ${{ steps.artifact.outputs.zip_name }}\nCommit: ${{ github.sha }}'
+          SHORT_SHA="${GITHUB_SHA::7}"
+          CAPTION=$'Kernel build: ${{ steps.artifact.outputs.zip_name }}\nCommit: '"${SHORT_SHA}"
           curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F chat_id="${TELEGRAM_CHAT_ID}" \
             -F document=@"${{ steps.artifact.outputs.zip_path }}" \
