@@ -242,11 +242,11 @@ struct ida {
 	spinlock_t		lock;
 };
 
-#define IDA_INIT	{						\
+#define IDA_INIT(name)	{						\
 	.ida_rt = RADIX_TREE_INIT(IDR_RT_MARKER | GFP_NOWAIT),		\
-	.lock = __SPIN_LOCK_UNLOCKED(lock),				\
+	.lock = __SPIN_LOCK_UNLOCKED(name.lock),			\
 }
-#define DEFINE_IDA(name)	struct ida name = IDA_INIT
+#define DEFINE_IDA(name)	struct ida name = IDA_INIT(name)
 
 int ida_pre_get(struct ida *ida, gfp_t gfp_mask);
 int ida_get_new_above(struct ida *ida, int starting_id, int *p_id);
