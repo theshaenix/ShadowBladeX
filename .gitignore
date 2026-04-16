@@ -76,6 +76,10 @@ modules.builtin
 !.gitignore
 !.mailmap
 !.cocciconfig
+!.github
+!.github/workflows
+!.github/workflows/*.yml
+!.github/workflows/*.yaml
 
 #
 # Generated include files
@@ -124,4 +128,3 @@ all.config
 
 # fetched Android config fragments
 kernel/configs/android-*.cfg
-

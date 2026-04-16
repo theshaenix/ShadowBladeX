@@ -1,0 +1,80 @@
+name: Kernel Build
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - "copilot/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CCACHE_DIR: ~/.ccache
+      KEEP_CCACHE: "1"
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache zip
+
+      - name: Cache toolchains and AnyKernel3
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/toolchains/clang
+            ~/toolchains/gcc-aarch64-linux-gnu-9.3
+            ~/AnyKernel3
+          key: ${{ runner.os }}-kernel-tools-v1
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ github.ref_name }}-
+            ${{ runner.os }}-ccache-
+
+      - name: Build kernel
+        run: bash ./bash.sh
+
+      - name: Collect artifact path
+        id: artifact
+        run: |
+          shopt -s nullglob
+          ZIP_FILES=(~/AnyKernel3/*.zip)
+          if [ ${#ZIP_FILES[@]} -eq 0 ]; then
+            echo "No zip artifact found in ~/AnyKernel3."
+            exit 1
+          fi
+          ZIP_PATH="$(ls -t "${ZIP_FILES[@]}" | head -n 1)"
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$(basename "$ZIP_PATH")" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.zip_name }}
+          path: ${{ steps.artifact.outputs.zip_path }}
+
+      - name: Upload to Telegram
+        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          printf -v CAPTION $'Kernel build: %s\nCommit: %s' "${{ steps.artifact.outputs.zip_name }}" "${SHORT_SHA}"
+          curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            -F chat_id="${TELEGRAM_CHAT_ID}" \
+            -F document=@"${{ steps.artifact.outputs.zip_path }}" \
+            -F caption="${CAPTION}"

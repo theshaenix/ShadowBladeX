@@ -67,7 +67,9 @@ echo -e "\n🛠️  \033[1;34mStarting Kernel Build: $BASE_ZIPNAME\033[0m"
 echo -e "\n🧹 \033[1;33mCleaning output and ccache...\033[0m"
 rm -rf $OUT_DIR/*
 rm -f "$ANYKERNEL_DIR/zImage"
-ccache -C > /dev/null 2>&1
+if [ "${KEEP_CCACHE:-0}" != "1" ]; then
+  ccache -C > /dev/null 2>&1
+fi
 
 echo -e "\n🔧 \033[1;36mCompiler Info:\033[0m"
 clang --version | head -n 1
