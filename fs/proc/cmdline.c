@@ -4,7 +4,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
-#if defined (CONFIG_INITRAMFS_IGNORE_SKIP_FLAG) \
+#if defined(CONFIG_INITRAMFS_IGNORE_SKIP_FLAG) \
 	|| defined(CONFIG_CMDLINE_HWC_IS_SKU) \
 	|| defined(CONFIG_CMDLINE_HWC_IS_PRODUCT_SKU)
 #define ALTER_CMDLINE
