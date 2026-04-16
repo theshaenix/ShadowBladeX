@@ -1461,5 +1461,5 @@ void susfs_init(void) {
 	SUSFS_LOGI("susfs is initialized! version: " SUSFS_VERSION " \n");
 }
 
-/* No module exit is needed becuase it should never be a loadable kernel module */
+/* No module exit is needed because it should never be a loadable kernel module */
 //void __init susfs_exit(void)

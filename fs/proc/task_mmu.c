@@ -368,7 +368,7 @@ show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 	const char *name = NULL;
 #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 	char *spoofed_redirected_name = NULL;
-#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIREC
+#endif // #ifdef CONFIG_KSU_SUSFS_OPEN_REDIRECT
 
 	if (file) {
 		struct inode *inode = file_inode(vma->vm_file);
@@ -997,7 +997,7 @@ static int show_smap(struct seq_file *m, void *v)
 bypass_orig_flow:
 #endif
 	m_cache_vma(m, vma);
-	
+
 	return 0;
 }
 
