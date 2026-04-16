@@ -239,10 +239,12 @@ DECLARE_PER_CPU(struct ida_bitmap *, ida_bitmap);
 
 struct ida {
 	struct radix_tree_root	ida_rt;
+	spinlock_t		lock;
 };
 
 #define IDA_INIT	{						\
 	.ida_rt = RADIX_TREE_INIT(IDR_RT_MARKER | GFP_NOWAIT),		\
+	.lock = __SPIN_LOCK_UNLOCKED(lock),				\
 }
 #define DEFINE_IDA(name)	struct ida name = IDA_INIT
 
@@ -307,6 +309,7 @@ static inline int ida_alloc_max(struct ida *ida, unsigned int max, gfp_t gfp)
 static inline void ida_init(struct ida *ida)
 {
 	INIT_RADIX_TREE(&ida->ida_rt, IDR_RT_MARKER | GFP_NOWAIT);
+	spin_lock_init(&ida->lock);
 }
 
 #define ida_simple_get(ida, start, end, gfp)	\
