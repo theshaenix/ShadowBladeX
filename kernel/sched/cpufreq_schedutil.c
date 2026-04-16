@@ -1057,8 +1057,17 @@ static int sugov_start(struct cpufreq_policy *policy)
 		 * maximum frequency.  A CPU is considered LP if its
 		 * capacity is below SCHED_CAPACITY_SCALE (the canonical
 		 * mark for the largest core in the system).
+		 *
+		 * arch_scale_cpu_capacity(NULL, cpu) retrieves the raw
+		 * CPU capacity where NULL means "use the default table
+		 * rather than a custom per-CPU override".
+		 *
+		 * CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ == 0 means the
+		 * cap is disabled and the original policy->cpuinfo.max_freq
+		 * ceiling is preserved.
 		 */
-#if CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ
+#if defined(CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ) && \
+    CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ > 0
 		if (arch_scale_cpu_capacity(NULL, cpu) < SCHED_CAPACITY_SCALE)
 			sg_cpu->iowait_boost_max =
 				CONFIG_SCHEDUTIL_LP_IOWAIT_BOOST_MAX_KHZ;
