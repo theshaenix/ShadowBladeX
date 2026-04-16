@@ -53,7 +53,13 @@ jobs:
       - name: Collect artifact path
         id: artifact
         run: |
-          ZIP_PATH="$(ls -t ~/AnyKernel3/*.zip | head -n 1)"
+          shopt -s nullglob
+          ZIP_FILES=(~/AnyKernel3/*.zip)
+          if [ ${#ZIP_FILES[@]} -eq 0 ]; then
+            echo "No zip artifact found in ~/AnyKernel3."
+            exit 1
+          fi
+          ZIP_PATH="$(ls -t "${ZIP_FILES[@]}" | head -n 1)"
           echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
           echo "zip_name=$(basename "$ZIP_PATH")" >> "$GITHUB_OUTPUT"
 
@@ -66,7 +72,8 @@ jobs:
       - name: Upload to Telegram
         if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         run: |
+          CAPTION=$'Kernel build: ${{ steps.artifact.outputs.zip_name }}\nCommit: ${{ github.sha }}'
           curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F chat_id="${TELEGRAM_CHAT_ID}" \
             -F document=@"${{ steps.artifact.outputs.zip_path }}" \
-            -F caption="Kernel build: ${{ steps.artifact.outputs.zip_name }}%0ACommit: ${{ github.sha }}"
+            -F caption="${CAPTION}"
