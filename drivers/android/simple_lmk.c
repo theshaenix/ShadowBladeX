@@ -21,6 +21,12 @@
 /* The minimum number of pages to free per reclaim */
 #define MIN_FREE_PAGES (CONFIG_ANDROID_SIMPLE_LMK_MINFREE * SZ_1M / PAGE_SIZE)
 
+/*
+ * Keep swap with the same budget as reclaim minfree: if either RAM or swap
+ * still has this much headroom, we can postpone killing user processes.
+ */
+#define SWAP_HEADROOM_PAGES MIN_FREE_PAGES
+
 /* Kill up to this many victims per reclaim */
 #define MAX_VICTIMS 1024
 
@@ -46,8 +52,8 @@ static atomic_t needs_reap = ATOMIC_INIT(0);
 static atomic_t nr_killed = ATOMIC_INIT(0);
 
 /*
- * Avoid reclaim kills while there is still comfortable memory headroom.
- * MIN_FREE_PAGES maps to the user-selected Android LMK minfree budget.
+ * Avoid reclaim kills while there is still comfortable headroom.
+ * MIN_FREE_PAGES is the RAM budget and SWAP_HEADROOM_PAGES is the swap budget.
  */
 static bool should_reclaim(unsigned long pressure)
 {
@@ -57,7 +63,7 @@ static bool should_reclaim(unsigned long pressure)
 	if (si_mem_available() > MIN_FREE_PAGES)
 		return false;
 
-	if (get_nr_swap_pages() > MIN_FREE_PAGES)
+	if (get_nr_swap_pages() > SWAP_HEADROOM_PAGES)
 		return false;
 
 	return true;
