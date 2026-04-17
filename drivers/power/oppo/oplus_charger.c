@@ -1700,7 +1700,7 @@ static ssize_t bypass_charging_write(struct file *filp,
 		return -EINVAL;
 	}
 	if (len >= sizeof(temp)) {
-		len = sizeof(temp) - 1;
+		return -EINVAL;
 	}
 	if (copy_from_user(temp, buff, len)) {
 		return -EFAULT;
@@ -1757,7 +1757,7 @@ static ssize_t charging_powersave_write(struct file *filp,
 		return -EINVAL;
 	}
 	if (len >= sizeof(temp)) {
-		len = sizeof(temp) - 1;
+		return -EINVAL;
 	}
 	if (copy_from_user(temp, buff, len)) {
 		return -EFAULT;
@@ -1780,14 +1780,17 @@ static ssize_t input_current_limit_ma_read(struct file *filp,
 		char __user *buff, size_t count, loff_t *off)
 {
 	struct oplus_chg_chip *chip = g_charger_chip;
-	char page[32] = {0};
+	char page[64] = {0};
 	int len = 0;
 
 	if (!chip) {
 		return -EFAULT;
 	}
 
-	len = snprintf(page, sizeof(page), "%d\n", chip->limits.input_current_led_ma_normal);
+	len = snprintf(page, sizeof(page), "%d\n%d\n%d\n",
+		       chip->limits.input_current_led_ma_high,
+		       chip->limits.input_current_led_ma_warm,
+		       chip->limits.input_current_led_ma_normal);
 	if (len > *off) {
 		len -= *off;
 	} else {
@@ -1814,7 +1817,7 @@ static ssize_t input_current_limit_ma_write(struct file *filp,
 		return -EINVAL;
 	}
 	if (len >= sizeof(temp)) {
-		len = sizeof(temp) - 1;
+		return -EINVAL;
 	}
 	if (copy_from_user(temp, buff, len)) {
 		return -EFAULT;
