@@ -75,20 +75,22 @@ jobs:
         env:
           ZIP_NAME: ${{ steps.artifact.outputs.zip_name }}
           ZIP_PATH: ${{ steps.artifact.outputs.zip_path }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
-          AUTHOR=$(git log -1 --pretty=format:"%an")
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo "(unavailable)")
           BUILD_DATE=$(date -u "+%Y-%m-%d %H:%M UTC")
           FILE_SIZE=$(du -sh "${ZIP_PATH}" | cut -f1)
-          CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>Author:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
-            "${{ github.ref_name }}" \
+          escape_html() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+          CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>By:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
+            "$(escape_html "${BRANCH_NAME}")" \
             "${SHORT_SHA}" \
-            "${COMMIT_MSG}" \
-            "${AUTHOR}" \
+            "$(escape_html "${COMMIT_MSG}")" \
+            "$(escape_html "${ACTOR}")" \
             "${BUILD_DATE}" \
             "${FILE_SIZE}" \
-            "${ZIP_NAME}")
+            "$(escape_html "${ZIP_NAME}")")
           curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F chat_id="${TELEGRAM_CHAT_ID}" \
             -F document=@"${ZIP_PATH}" \
