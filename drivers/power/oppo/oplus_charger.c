@@ -1632,9 +1632,9 @@ static void oplus_chg_set_bypass_charging(struct oplus_chg_chip *chip, bool enab
 		chip->chg_ops->charging_disable();
 		chip->chg_ops->charger_suspend();
 		chip->mmi_chg = 0;
+		/* stop_chg==0 is used by this driver's discharging/bypass path */
 		chip->stop_chg = 0;
 		chip->prop_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
-		chip->chg_powersave = true;
 		if (oplus_vooc_get_fastchg_started() == true) {
 			oplus_vooc_turn_off_fastchg();
 			chip->mmi_fastchg = 0;
@@ -1646,7 +1646,6 @@ static void oplus_chg_set_bypass_charging(struct oplus_chg_chip *chip, bool enab
 		chip->mmi_chg = 1;
 		chip->stop_chg = 1;
 		chip->prop_status = POWER_SUPPLY_STATUS_CHARGING;
-		chip->chg_powersave = false;
 		chip->batt_full = false;
 		oplus_chg_set_input_current_limit(chip);
 	}
@@ -1820,6 +1819,7 @@ static ssize_t input_current_limit_ma_write(struct file *filp,
 	if (kstrtoint(temp, 0, &limit_current)) {
 		return -EINVAL;
 	}
+	/* keep floor conservative to avoid invalid/too-low USB input settings */
 	if (limit_current < 300) {
 		limit_current = 300;
 	}
@@ -1904,7 +1904,7 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 			  __LINE__);
 	}
 
-	prEntry_tmp = proc_create_data("bypass_charging", 0666, prEntry_da,
+	prEntry_tmp = proc_create_data("bypass_charging", 0644, prEntry_da,
 				       &bypass_charging_proc_fops, chip);
 	if (prEntry_tmp == NULL) {
 		ret = -1;
@@ -1912,7 +1912,7 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 			  __func__, __LINE__);
 	}
 
-	prEntry_tmp = proc_create_data("charging_powersave", 0666, prEntry_da,
+	prEntry_tmp = proc_create_data("charging_powersave", 0644, prEntry_da,
 				       &charging_powersave_proc_fops, chip);
 	if (prEntry_tmp == NULL) {
 		ret = -1;
@@ -1920,7 +1920,7 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 			  __func__, __LINE__);
 	}
 
-	prEntry_tmp = proc_create_data("input_current_limit_ma", 0666, prEntry_da,
+	prEntry_tmp = proc_create_data("input_current_limit_ma", 0644, prEntry_da,
 				       &input_current_limit_ma_proc_fops, chip);
 	if (prEntry_tmp == NULL) {
 		ret = -1;
