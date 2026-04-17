@@ -1498,6 +1498,43 @@ unsigned long nswap_reclaim_page_list(struct list_head *page_list,
 }
 #endif
 
+/*
+ * madvise_reclaim_page_list - force-reclaim a list of isolated pages.
+ * Called by MADV_PAGEOUT to immediately reclaim pages from a process's
+ * address space without relying on memory pressure or LRU rotation.
+ *
+ * The pages must have been isolated from the LRU (via isolate_lru_page)
+ * with NR_ISOLATED_ANON/FILE already incremented by the caller.
+ */
+unsigned long madvise_reclaim_page_list(struct list_head *page_list)
+{
+	struct scan_control sc = {
+		.gfp_mask = GFP_KERNEL,
+		.priority = DEF_PRIORITY,
+		.may_writepage = 1,
+		.may_unmap = 1,
+		.may_swap = 1,
+	};
+	unsigned long nr_reclaimed;
+	struct page *page;
+
+	list_for_each_entry(page, page_list, lru)
+		ClearPageActive(page);
+
+	nr_reclaimed = shrink_page_list(page_list, NULL, &sc,
+			TTU_IGNORE_ACCESS, NULL, true);
+
+	while (!list_empty(page_list)) {
+		page = lru_to_page(page_list);
+		list_del(&page->lru);
+		dec_node_page_state(page, NR_ISOLATED_ANON +
+				page_is_file_cache(page));
+		putback_lru_page(page);
+	}
+
+	return nr_reclaimed;
+}
+
 #ifdef CONFIG_PROCESS_RECLAIM
 #if defined(OPLUS_FEATURE_PROCESS_RECLAIM) && defined(CONFIG_PROCESS_RECLAIM_ENHANCE)
 unsigned long reclaim_pages_from_list(struct list_head *page_list,
@@ -3657,8 +3694,20 @@ static int balance_pgdat(pg_data_t *pgdat, int order, int classzone_idx)
 		 * sc.reclaim_idx is not used as buffer_heads_over_limit may
 		 * have adjusted it.
 		 */
-		if (pgdat_balanced(pgdat, sc.order, classzone_idx))
+		if (pgdat_balanced(pgdat, sc.order, classzone_idx)) {
+			/*
+			 * The pgdat is balanced. Clear any watermark boosts
+			 * that were set during fragmentation events so that
+			 * future allocations are not penalised.
+			 */
+			for (i = 0; i < pgdat->nr_zones; i++) {
+				struct zone *z = pgdat->node_zones + i;
+
+				if (z->watermark_boost)
+					z->watermark_boost = 0;
+			}
 			goto out;
+		}
 
 		/*
 		 * Do some background aging of the anon list, to give

@@ -334,6 +334,17 @@ int user_min_free_kbytes = -1;
 int watermark_scale_factor = 10;
 
 /*
+ * Watermark boost factor: when the allocator falls back to a non-preferred
+ * migration type (a fragmentation event), the zone's effective watermark is
+ * temporarily raised by boost_watermark() to make kswapd reclaim more
+ * aggressively and restore contiguous free pages.
+ *
+ * The boost is expressed in units of 1/10000 of WMARK_HIGH; the default
+ * 15000 = 150% of WMARK_HIGH.  Set to 0 to disable the feature.
+ */
+int watermark_boost_factor __read_mostly = 15000;
+
+/*
  * Extra memory for the system to try freeing. Used to temporarily
  * free memory, to make space for new workloads. Anyone can allocate
  * down to the min watermarks controlled by min_free_kbytes above.
@@ -2122,6 +2133,36 @@ static bool can_steal_fallback(unsigned int order, int start_mt)
 }
 
 /*
+ * boost_watermark - temporarily raise a zone's effective watermark.
+ *
+ * Called (with zone->lock held) when an allocation falls back to a
+ * non-preferred migration type, which signals memory fragmentation.
+ * The raised watermark forces kswapd to reclaim more pages and rebuild
+ * contiguous free areas.  The boost is bounded by watermark_boost_factor
+ * times WMARK_HIGH and decays when the zone is rebalanced.
+ */
+static void boost_watermark(struct zone *zone)
+{
+	unsigned long max_boost;
+
+	if (!watermark_boost_factor)
+		return;
+
+	if (!managed_zone(zone))
+		return;
+
+	max_boost = mult_frac(zone->watermark[WMARK_HIGH],
+			      watermark_boost_factor, 10000);
+	if (!max_boost)
+		return;
+
+	max_boost = max(pageblock_nr_pages, max_boost);
+
+	zone->watermark_boost = min(zone->watermark_boost + pageblock_nr_pages,
+				    max_boost);
+}
+
+/*
  * This function implements actual steal behaviour. If order is large enough,
  * we can steal whole pageblock. If not, we first move freepages in this
  * pageblock to our migratetype and determine how many already-allocated pages
@@ -2141,6 +2182,13 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 	int old_block_type;
 
 	old_block_type = get_pageblock_migratetype(page);
+
+	/*
+	 * Boost the zone watermark to encourage kswapd to reclaim more pages
+	 * and reduce fragmentation.  This is a fragmentation event: we are
+	 * stealing pages from a pageblock of the wrong migratetype.
+	 */
+	boost_watermark(zone);
 
 	/*
 	 * This can happen due to races and we want to prevent broken
@@ -3227,6 +3275,13 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 #if defined(OPLUS_FEATURE_MULTI_FREEAREA) && defined(CONFIG_PHYSICAL_ANTI_FRAGMENTATION)
     int flc;
 #endif
+
+	/*
+	 * Include any watermark boost.  The boost is raised by
+	 * boost_watermark() on fragmentation events and cleared by kswapd
+	 * after the zone is rebalanced.
+	 */
+	min += z->watermark_boost;
 
 	/* free_pages may go negative - that's OK */
 	free_pages -= (1 << order) - 1;
@@ -7604,6 +7659,12 @@ int watermark_scale_factor_sysctl_handler(struct ctl_table *table, int write,
 		setup_per_zone_wmarks();
 
 	return 0;
+}
+
+int watermark_boost_factor_sysctl_handler(struct ctl_table *table, int write,
+	void __user *buffer, size_t *length, loff_t *ppos)
+{
+	return proc_dointvec_minmax(table, write, buffer, length, ppos);
 }
 
 #ifdef CONFIG_NUMA

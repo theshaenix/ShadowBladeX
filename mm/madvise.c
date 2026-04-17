@@ -24,6 +24,8 @@
 #include <linux/swapops.h>
 #include <linux/shmem_fs.h>
 #include <linux/mmu_notifier.h>
+#include <linux/rmap.h>
+#include <linux/vmstat.h>
 
 #include <asm/tlb.h>
 
@@ -41,6 +43,8 @@ static int madvise_need_mmap_write(int behavior)
 	case MADV_WILLNEED:
 	case MADV_DONTNEED:
 	case MADV_FREE:
+	case MADV_COLD:
+	case MADV_PAGEOUT:
 		return 0;
 	default:
 		/* be safe, default to 1. list exceptions explicitly */
@@ -687,6 +691,136 @@ static int madvise_inject_error(int behavior,
 }
 #endif
 
+/*
+ * Private state for MADV_COLD and MADV_PAGEOUT page table walks.
+ */
+struct madvise_cold_private {
+	bool pageout;
+};
+
+/*
+ * Walk a PMD range and either deactivate (MADV_COLD) or force-reclaim
+ * (MADV_PAGEOUT) the pages mapped in [addr, end).
+ *
+ * MADV_COLD:    moves active pages to the inactive LRU tail so the VM
+ *               reclaims them before other pages under memory pressure.
+ * MADV_PAGEOUT: isolates pages from the LRU and immediately reclaims them,
+ *               writing dirty ones to swap/storage first if needed.
+ */
+static int madvise_cold_or_pageout_pte_range(pmd_t *pmd,
+		unsigned long addr, unsigned long end, struct mm_walk *walk)
+{
+	struct madvise_cold_private *private = walk->private;
+	bool pageout = private->pageout;
+	struct vm_area_struct *vma = walk->vma;
+	pte_t *orig_pte, *pte, ptent;
+	spinlock_t *ptl;
+	struct page *page;
+	LIST_HEAD(page_list);
+
+	if (pmd_trans_unstable(pmd))
+		return 0;
+
+	orig_pte = pte = pte_offset_map_lock(vma->vm_mm, pmd, addr, &ptl);
+	for (; addr < end; pte++, addr += PAGE_SIZE) {
+		ptent = *pte;
+		if (!pte_present(ptent))
+			continue;
+
+		page = vm_normal_page(vma, addr, ptent);
+		if (!page)
+			continue;
+
+		if (PageTransCompound(page))
+			continue;
+
+		if (PageUnevictable(page))
+			continue;
+
+		if (pageout) {
+			if (!isolate_lru_page(page)) {
+				inc_node_page_state(page,
+					NR_ISOLATED_ANON +
+					page_is_file_cache(page));
+				list_add(&page->lru, &page_list);
+			}
+		} else {
+			/* MADV_COLD: push pages toward inactive LRU */
+			if (PageActive(page)) {
+				if (PageAnon(page))
+					mark_page_lazyfree(page);
+				else
+					deactivate_file_page(page);
+			}
+		}
+	}
+	pte_unmap_unlock(orig_pte, ptl);
+
+	if (pageout)
+		madvise_reclaim_page_list(&page_list);
+
+	cond_resched();
+	return 0;
+}
+
+static long madvise_cold(struct vm_area_struct *vma,
+		struct vm_area_struct **prev,
+		unsigned long start_addr, unsigned long end_addr)
+{
+	unsigned long start, end;
+	struct mm_struct *mm = vma->vm_mm;
+	struct madvise_cold_private private = { .pageout = false };
+	struct mm_walk cold_walk = {
+		.pmd_entry = madvise_cold_or_pageout_pte_range,
+		.mm = mm,
+		.private = &private,
+	};
+
+	*prev = vma;
+	if (vma->vm_flags & (VM_LOCKED | VM_PFNMAP))
+		return -EINVAL;
+
+	start = max(vma->vm_start, start_addr);
+	if (start >= vma->vm_end)
+		return -EINVAL;
+	end = min(vma->vm_end, end_addr);
+	if (end <= vma->vm_start)
+		return -EINVAL;
+
+	lru_add_drain();
+	walk_page_range(start, end, &cold_walk);
+	return 0;
+}
+
+static long madvise_pageout(struct vm_area_struct *vma,
+		struct vm_area_struct **prev,
+		unsigned long start_addr, unsigned long end_addr)
+{
+	unsigned long start, end;
+	struct mm_struct *mm = vma->vm_mm;
+	struct madvise_cold_private private = { .pageout = true };
+	struct mm_walk pageout_walk = {
+		.pmd_entry = madvise_cold_or_pageout_pte_range,
+		.mm = mm,
+		.private = &private,
+	};
+
+	*prev = vma;
+	if (vma->vm_flags & (VM_LOCKED | VM_PFNMAP))
+		return -EINVAL;
+
+	start = max(vma->vm_start, start_addr);
+	if (start >= vma->vm_end)
+		return -EINVAL;
+	end = min(vma->vm_end, end_addr);
+	if (end <= vma->vm_start)
+		return -EINVAL;
+
+	lru_add_drain();
+	walk_page_range(start, end, &pageout_walk);
+	return 0;
+}
+
 static long
 madvise_vma(struct vm_area_struct *vma, struct vm_area_struct **prev,
 		unsigned long start, unsigned long end, int behavior)
@@ -699,6 +833,10 @@ madvise_vma(struct vm_area_struct *vma, struct vm_area_struct **prev,
 	case MADV_FREE:
 	case MADV_DONTNEED:
 		return madvise_dontneed_free(vma, prev, start, end, behavior);
+	case MADV_COLD:
+		return madvise_cold(vma, prev, start, end);
+	case MADV_PAGEOUT:
+		return madvise_pageout(vma, prev, start, end);
 	default:
 		return madvise_behavior(vma, prev, start, end, behavior);
 	}
@@ -729,6 +867,8 @@ madvise_behavior_valid(int behavior)
 	case MADV_DODUMP:
 	case MADV_WIPEONFORK:
 	case MADV_KEEPONFORK:
+	case MADV_COLD:
+	case MADV_PAGEOUT:
 #ifdef CONFIG_MEMORY_FAILURE
 	case MADV_SOFT_OFFLINE:
 	case MADV_HWPOISON:
@@ -769,6 +909,10 @@ madvise_behavior_valid(int behavior)
  *  MADV_DONTFORK - omit this area from child's address space when forking:
  *		typically, to avoid COWing pages pinned by get_user_pages().
  *  MADV_DOFORK - cancel MADV_DONTFORK: no longer omit this area when forking.
+ *  MADV_COLD - mark the given range as less likely to be used soon; pages
+ *		are moved to the inactive LRU list for earlier reclaim.
+ *  MADV_PAGEOUT - reclaim the given range immediately; useful for LMKD to
+ *		free process pages without terminating the process.
  *  MADV_WIPEONFORK - present the child process with zero-filled memory in this
  *              range after a fork.
  *  MADV_KEEPONFORK - undo the effect of MADV_WIPEONFORK

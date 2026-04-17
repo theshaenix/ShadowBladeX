@@ -160,10 +160,11 @@ static int __init setup_psi(char *str)
 __setup("psi=", setup_psi);
 
 /* Running averages - we need to be higher-res than loadavg */
-#define PSI_FREQ	(2*HZ+1)	/* 2 sec intervals */
-#define EXP_10s		1677		/* 1/exp(2s/10s) as fixed-point */
-#define EXP_60s		1981		/* 1/exp(2s/60s) */
-#define EXP_300s	2034		/* 1/exp(2s/300s) */
+#define PSI_FREQ	(HZ)		/* 1 sec intervals */
+#define EXP_1s		753		/* 1/exp(1s/1s)   as fixed-point */
+#define EXP_10s		1853		/* 1/exp(1s/10s)  as fixed-point */
+#define EXP_60s		2014		/* 1/exp(1s/60s)  as fixed-point */
+#define EXP_300s	2041		/* 1/exp(1s/300s) as fixed-point */
 
 /* PSI trigger definitions */
 #define WINDOW_MIN_US 500000	/* Min window size is 500ms */
@@ -284,7 +285,7 @@ static void get_recent_times(struct psi_group *group, int cpu,
 	}
 }
 
-static void calc_avgs(unsigned long avg[3], int missed_periods,
+static void calc_avgs(unsigned long avg[4], int missed_periods,
 		      u64 time, u64 period)
 {
 	unsigned long pct;
@@ -294,6 +295,7 @@ static void calc_avgs(unsigned long avg[3], int missed_periods,
 		avg[0] = calc_load_n(avg[0], EXP_10s, 0, missed_periods);
 		avg[1] = calc_load_n(avg[1], EXP_60s, 0, missed_periods);
 		avg[2] = calc_load_n(avg[2], EXP_300s, 0, missed_periods);
+		avg[3] = calc_load_n(avg[3], EXP_1s, 0, missed_periods);
 	}
 
 	/* Sample the most recent active period */
@@ -302,6 +304,7 @@ static void calc_avgs(unsigned long avg[3], int missed_periods,
 	avg[0] = calc_load(avg[0], EXP_10s, pct);
 	avg[1] = calc_load(avg[1], EXP_60s, pct);
 	avg[2] = calc_load(avg[2], EXP_300s, pct);
+	avg[3] = calc_load(avg[3], EXP_1s, pct);
 }
 
 static void collect_percpu_times(struct psi_group *group,
@@ -959,17 +962,18 @@ int psi_show(struct seq_file *m, struct psi_group *group, enum psi_res res)
 	mutex_unlock(&group->avgs_lock);
 
 	for (full = 0; full < 2 - (res == PSI_CPU); full++) {
-		unsigned long avg[3];
+		unsigned long avg[4];
 		u64 total;
 		int w;
 
-		for (w = 0; w < 3; w++)
+		for (w = 0; w < 4; w++)
 			avg[w] = group->avg[res * 2 + full][w];
 		total = div_u64(group->total[PSI_AVGS][res * 2 + full],
 				NSEC_PER_USEC);
 
-		seq_printf(m, "%s avg10=%lu.%02lu avg60=%lu.%02lu avg300=%lu.%02lu total=%llu\n",
+		seq_printf(m, "%s avg1=%lu.%02lu avg10=%lu.%02lu avg60=%lu.%02lu avg300=%lu.%02lu total=%llu\n",
 			   full ? "full" : "some",
+			   LOAD_INT(avg[3]), LOAD_FRAC(avg[3]),
 			   LOAD_INT(avg[0]), LOAD_FRAC(avg[0]),
 			   LOAD_INT(avg[1]), LOAD_FRAC(avg[1]),
 			   LOAD_INT(avg[2]), LOAD_FRAC(avg[2]),

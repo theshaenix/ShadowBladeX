@@ -40,6 +40,9 @@ void page_writeback_init(void);
 
 int do_swap_page(struct vm_fault *vmf);
 
+/* Reclaim a list of pages isolated from the LRU (used by MADV_PAGEOUT) */
+unsigned long madvise_reclaim_page_list(struct list_head *page_list);
+
 #ifdef CONFIG_SPECULATIVE_PAGE_FAULT
 extern struct vm_area_struct *get_vma(struct mm_struct *mm,
 				      unsigned long addr);
