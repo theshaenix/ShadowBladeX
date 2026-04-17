@@ -247,6 +247,13 @@ void *workingset_eviction(struct address_space *mapping, struct page *page)
  *
  * Calculates and evaluates the refault distance of the previously
  * evicted page in the context of the node it was allocated in.
+ *
+ * For file-backed pages, the refault distance is compared against the
+ * size of the active file list.  For anonymous pages (swap-backed), it
+ * is compared against the size of the active anon list.  If the page
+ * would have stayed resident if the active list were its only constraint,
+ * activate it immediately to protect it from being reclaimed again right
+ * away.
  */
 void workingset_refault(struct page *page, void *shadow)
 {
@@ -310,9 +317,23 @@ void workingset_refault(struct page *page, void *shadow)
 	 * Compare the distance to the existing workingset size. We
 	 * don't act on pages that couldn't stay resident even if all
 	 * the memory was available to the page cache.
+	 *
+	 * For anonymous pages (swap refaults), compare against the
+	 * active anon size.  Swapped-in pages that refault within the
+	 * active anon window were recently active and should be
+	 * promoted immediately to avoid thrashing.
 	 */
-	if (refault_distance > active_file)
-		goto out;
+	if (PageAnon(page)) {
+		unsigned long active_anon;
+
+		active_anon = lruvec_lru_size(lruvec, LRU_ACTIVE_ANON,
+					      MAX_NR_ZONES);
+		if (refault_distance > active_anon)
+			goto out;
+	} else {
+		if (refault_distance > active_file)
+			goto out;
+	}
 
 	SetPageActive(page);
 	atomic_long_inc(&lruvec->inactive_age);
