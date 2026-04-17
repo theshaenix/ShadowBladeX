@@ -1024,6 +1024,10 @@ static int adreno_of_get_power(struct adreno_device *adreno_dev,
 
 	device->pwrctrl.interval_timeout = msecs_to_jiffies(timeout);
 
+	/* slumber-timeout defaults to 0 (use interval_timeout as fallback) */
+	if (!of_property_read_u32(node, "qcom,slumber-timeout", &timeout))
+		device->pwrctrl.slumber_timeout = msecs_to_jiffies(timeout);
+
 	device->pwrctrl.bus_control = of_property_read_bool(node,
 		"qcom,bus-control");
 

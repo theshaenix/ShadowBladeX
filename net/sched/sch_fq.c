@@ -111,6 +111,14 @@ struct fq_sched_data {
 	u64		stat_flows_plimit;
 	u64		stat_pkts_too_long;
 	u64		stat_allocation_errors;
+
+	/* Horizon: packets scheduled more than horizon_ns in the future are
+	 * either dropped (horizon_drop=1) or set to send at horizon boundary.
+	 * Default: 10 seconds.  0 disables the feature.
+	 */
+	u64		horizon;
+	bool		horizon_drop;
+
 	struct qdisc_watchdog watchdog;
 };
 
@@ -393,6 +401,20 @@ static int fq_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 
 	if (unlikely(sch->q.qlen >= sch->limit))
 		return qdisc_drop(skb, sch, to_free);
+
+	/* Horizon check: reject or cap packets with a send-time too far ahead */
+	if (q->horizon && skb->tstamp) {
+		u64 now = ktime_get_ns();
+		s64 delta = ktime_to_ns(skb->tstamp) - now;
+
+		if (delta > 0 && (u64)delta > q->horizon) {
+			q->stat_pkts_too_long++;
+			if (q->horizon_drop)
+				return qdisc_drop(skb, sch, to_free);
+			/* Not dropping: cap tstamp to horizon boundary */
+			skb->tstamp = ns_to_ktime(now + q->horizon);
+		}
+	}
 
 	f = fq_classify(skb, q);
 	if (unlikely(f->qlen >= q->flow_plimit && f != &q->internal)) {
@@ -697,6 +719,10 @@ static const struct nla_policy fq_policy[TCA_FQ_MAX + 1] = {
 	[TCA_FQ_FLOW_REFILL_DELAY]	= { .type = NLA_U32 },
 	[TCA_FQ_ORPHAN_MASK]		= { .type = NLA_U32 },
 	[TCA_FQ_LOW_RATE_THRESHOLD]	= { .type = NLA_U32 },
+	[TCA_FQ_CE_THRESHOLD]		= { .type = NLA_U32 },
+	[TCA_FQ_TIMER_SLACK]		= { .type = NLA_U32 },
+	[TCA_FQ_HORIZON]		= { .type = NLA_U32 },
+	[TCA_FQ_HORIZON_DROP]		= { .type = NLA_U8  },
 };
 
 static int fq_change(struct Qdisc *sch, struct nlattr *opt)
@@ -773,6 +799,16 @@ static int fq_change(struct Qdisc *sch, struct nlattr *opt)
 	if (tb[TCA_FQ_ORPHAN_MASK])
 		q->orphan_mask = nla_get_u32(tb[TCA_FQ_ORPHAN_MASK]);
 
+	if (tb[TCA_FQ_HORIZON]) {
+		/* Horizon is given in microseconds; store as nanoseconds */
+		u64 horizon_us = nla_get_u32(tb[TCA_FQ_HORIZON]);
+
+		q->horizon = horizon_us * NSEC_PER_USEC;
+	}
+
+	if (tb[TCA_FQ_HORIZON_DROP])
+		q->horizon_drop = !!nla_get_u8(tb[TCA_FQ_HORIZON_DROP]);
+
 	if (!err) {
 		sch_tree_unlock(sch);
 		err = fq_resize(sch, fq_log);
@@ -822,6 +858,8 @@ static int fq_init(struct Qdisc *sch, struct nlattr *opt)
 	q->fq_trees_log		= ilog2(1024);
 	q->orphan_mask		= 1024 - 1;
 	q->low_rate_threshold	= 550000 / 8;
+	q->horizon		= 10ULL * NSEC_PER_SEC;	/* 10 second horizon */
+	q->horizon_drop		= 1;			/* drop by default */
 	qdisc_watchdog_init(&q->watchdog, sch);
 
 	if (opt)
@@ -854,7 +892,10 @@ static int fq_dump(struct Qdisc *sch, struct sk_buff *skb)
 	    nla_put_u32(skb, TCA_FQ_ORPHAN_MASK, q->orphan_mask) ||
 	    nla_put_u32(skb, TCA_FQ_LOW_RATE_THRESHOLD,
 			q->low_rate_threshold) ||
-	    nla_put_u32(skb, TCA_FQ_BUCKETS_LOG, q->fq_trees_log))
+	    nla_put_u32(skb, TCA_FQ_BUCKETS_LOG, q->fq_trees_log) ||
+	    nla_put_u32(skb, TCA_FQ_HORIZON,
+			div_u64(q->horizon, NSEC_PER_USEC)) ||
+	    nla_put_u8(skb,  TCA_FQ_HORIZON_DROP, q->horizon_drop))
 		goto nla_put_failure;
 
 	return nla_nest_end(skb, opts);
