@@ -114,7 +114,7 @@ static int lmk_fast_run = 1;
 static unsigned long lowmem_deathpending_timeout;
 
 #ifdef OPLUS_FEATURE_PERFORMANCE
-static unsigned int almk_totalram_ratio = 6;
+static unsigned int almk_totalram_ratio = 10;
 module_param_named(almk_totalram_ratio, almk_totalram_ratio, uint, 0644);
 #endif
 
