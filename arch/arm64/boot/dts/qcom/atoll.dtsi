@@ -3536,8 +3536,8 @@
 
 			qcom,speed-bin = <0>;
 
-			qcom,initial-pwrlevel = <6>;
-			qcom,ca-target-pwrlevel = <5>;
+			qcom,initial-pwrlevel = <4>;
+			qcom,ca-target-pwrlevel = <3>;
 
 			/* TURBO_L1 */
 			qcom,gpu-pwrlevel@0 {
@@ -3618,8 +3618,8 @@
 
 			qcom,speed-bin = <174>;
 
-			qcom,initial-pwrlevel = <6>;
-			qcom,ca-target-pwrlevel = <5>;
+			qcom,initial-pwrlevel = <4>;
+			qcom,ca-target-pwrlevel = <3>;
 
 			/* TURBO_L1 */
 			qcom,gpu-pwrlevel@0 {

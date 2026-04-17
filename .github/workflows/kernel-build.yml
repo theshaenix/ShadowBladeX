@@ -61,8 +61,11 @@ jobs:
             exit 1
           fi
           ZIP_PATH="$(ls -t "${ZIP_FILES[@]}" | head -n 1)"
+          ZIP_NAME="$(basename "$ZIP_PATH")"
           echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
-          echo "zip_name=$(basename "$ZIP_PATH")" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -72,10 +75,29 @@ jobs:
 
       - name: Upload to Telegram
         if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          printf -v CAPTION $'Kernel build: %s\nCommit: %s' "${{ steps.artifact.outputs.zip_name }}" "${SHORT_SHA}"
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null | head -c 200 || echo "(unavailable)")
+          BUILD_DATE=$(date -u "+%Y-%m-%d %H:%M UTC")
+          if [ ! -f "${ZIP_PATH}" ]; then
+            echo "Zip artifact not found at: ${ZIP_PATH}"
+            exit 1
+          fi
+          FILE_SIZE=$(du -sh "${ZIP_PATH}" | cut -f1)
+          escape_html() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+          CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>By:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
+            "$(escape_html "${BRANCH_NAME}")" \
+            "${SHORT_SHA}" \
+            "$(escape_html "${COMMIT_MSG}")" \
+            "$(escape_html "${ACTOR}")" \
+            "${BUILD_DATE}" \
+            "${FILE_SIZE}" \
+            "$(escape_html "${ZIP_NAME}")")
           curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
-            -F chat_id="${TELEGRAM_CHAT_ID}" \
-            -F document=@"${{ steps.artifact.outputs.zip_path }}" \
-            -F caption="${CAPTION}"
+            --form-string chat_id="${TELEGRAM_CHAT_ID}" \
+            -F "document=@${ZIP_PATH}" \
+            --form-string caption="${CAPTION}" \
+            --form-string parse_mode="HTML"

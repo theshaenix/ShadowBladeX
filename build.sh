@@ -40,7 +40,7 @@ fi
 # ============================================================
 
 # Kernel build configuration
-KERNEL_NAME="Lightning-McQueen-"
+KERNEL_NAME="Lightning-McQueen"
 VERSION_NUMBER="v1.0.1"
 
 DATE=$(date +%Y%m%d)
@@ -117,6 +117,9 @@ echo -e "\n✅ \033[1;32mKernel image compiled successfully.\033[0m"
 
 echo -e "\n📦 \033[1;34mPacking kernel into flashable zip...\033[0m"
 cp "$KERNEL_IMG" "$ANYKERNEL_DIR/zImage"
+
+# Remove any leftover zip files from previous builds / cache
+rm -f "$ANYKERNEL_DIR"/*.zip
 
 cd $ANYKERNEL_DIR || exit 1
 zip -r9 "$ZIPNAME" * -x "*.zip" "*.git*" README.md > /dev/null
