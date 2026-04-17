@@ -106,7 +106,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 				 * 15 is ~13-30min depending on RTO.
 				 */
 
-#define TCP_SYN_RETRIES	 6	/* This is how many retries are done
+#define TCP_SYN_RETRIES	 4	/* This is how many retries are done
 				 * when active opening a connection.
 				 * RFC1122 says the minimum retry MUST
 				 * be at least 180secs.  Nevertheless
@@ -115,7 +115,7 @@ void tcp_time_wait(struct sock *sk, int state, int timeo);
 				 * current initial RTO.
 				 */
 
-#define TCP_SYNACK_RETRIES 5	/* This is how may retries are done
+#define TCP_SYNACK_RETRIES 4	/* This is how may retries are done
 				 * when passive opening a connection.
 				 * This is corresponding to 31secs of
 				 * retransmission with the current
