@@ -977,6 +977,19 @@ static int sugov_init(struct cpufreq_policy *policy)
 
 	sugov_tunables_restore(policy);
 
+	/*
+	 * Auto-calibrate hispeed_freq per cluster when not explicitly set.
+	 * For the Snapdragon 720G (and other big.LITTLE SoCs) each policy
+	 * has a different max frequency; setting hispeed_freq to 85% of the
+	 * cluster max avoids pinning small cores at their maximum clock
+	 * while still letting big cores ramp up quickly under heavy load.
+	 */
+	if (!tunables->hispeed_freq)
+		tunables->hispeed_freq = (policy->cpuinfo.max_freq / 100) * 85;
+
+	if (!tunables->hispeed_load)
+		tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
+
 	ret = kobject_init_and_add(&tunables->attr_set.kobj, &sugov_tunables_ktype,
 				   get_governor_parent_kobj(policy), "%s",
 				   schedutil_gov.name);

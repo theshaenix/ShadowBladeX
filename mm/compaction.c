@@ -1929,9 +1929,87 @@ void compaction_unregister_node(struct node *node)
 }
 #endif /* CONFIG_SYSFS && CONFIG_NUMA */
 
+/*
+ * sysctl_compaction_proactiveness - user knob to set the aggressiveness
+ * of proactive compaction.
+ *
+ * Range: 0 (disabled) to 100. A higher value causes kcompactd to compact
+ * more aggressively.  The default 20 targets a fragmentation score of 80 or
+ * below; raising it above 0 triggers proactive compaction even when no
+ * allocation failures are pending.
+ */
+unsigned int __read_mostly sysctl_compaction_proactiveness = 20;
+
+/*
+ * fragmentation_score_zone - compute a per-zone fragmentation score.
+ *
+ * Returns a value in [0, 100] where 100 is maximally fragmented and 0 is
+ * a perfectly ordered buddy list.  We average the per-order fragmentation
+ * indices for orders 1..MAX_ORDER-1 (order-0 always has plenty of pages).
+ */
+static unsigned int fragmentation_score_zone(struct zone *zone)
+{
+	unsigned int score = 0;
+	int order;
+	unsigned int nr_orders = MAX_ORDER - 1;
+
+	for (order = 1; order < MAX_ORDER; order++) {
+		int index = fragmentation_index(zone, order);
+
+		/*
+		 * fragmentation_index returns -1000 when the allocation would
+		 * succeed (no fragmentation for this order).  Clamp negative
+		 * values to 0 so they don't drag the average down.
+		 */
+		if (index < 0)
+			index = 0;
+
+		score += index;
+	}
+
+	return score / (nr_orders * 10);
+}
+
+/*
+ * fragmentation_score_node - average per-zone score across a pgdat.
+ */
+static unsigned int fragmentation_score_node(pg_data_t *pgdat)
+{
+	unsigned int score = 0;
+	int zoneid;
+
+	for (zoneid = 0; zoneid < pgdat->nr_zones; zoneid++) {
+		struct zone *zone = &pgdat->node_zones[zoneid];
+
+		if (!populated_zone(zone))
+			continue;
+		score += fragmentation_score_zone(zone);
+	}
+
+	return score;
+}
+
+/*
+ * compaction_proactiveness_score_threshold - return the fragmentation score
+ * above which proactive compaction should run.
+ *
+ * A proactiveness of 0 disables the feature.
+ * A proactiveness of 100 means compact whenever the score is > 0.
+ */
+static unsigned int compaction_proactiveness_score_threshold(void)
+{
+	unsigned int p = READ_ONCE(sysctl_compaction_proactiveness);
+
+	if (!p)
+		return UINT_MAX;
+
+	return 100 - p;
+}
+
 static inline bool kcompactd_work_requested(pg_data_t *pgdat)
 {
-	return pgdat->kcompactd_max_order > 0 || kthread_should_stop();
+	return pgdat->kcompactd_max_order > 0 || kthread_should_stop() ||
+		pgdat->proactive_compact_trigger;
 }
 
 static bool kcompactd_node_suitable(pg_data_t *pgdat)
@@ -2071,10 +2149,37 @@ static int kcompactd(void *p)
 
 	while (!kthread_should_stop()) {
 		unsigned long pflags;
+		unsigned int score, threshold;
+		bool should_compact;
 
 		trace_mm_compaction_kcompactd_sleep(pgdat->node_id);
-		wait_event_freezable(pgdat->kcompactd_wait,
+
+		/*
+		 * Proactive compaction: if enabled, schedule a periodic wakeup
+		 * (every 500 ms) to check the fragmentation score even without
+		 * an explicit allocation failure requesting compaction.  This
+		 * avoids fragmentation building up silently.
+		 */
+		if (sysctl_compaction_proactiveness) {
+			wait_event_freezable_timeout(pgdat->kcompactd_wait,
+				kcompactd_work_requested(pgdat),
+				msecs_to_jiffies(500));
+		} else {
+			wait_event_freezable(pgdat->kcompactd_wait,
 				kcompactd_work_requested(pgdat));
+		}
+
+		if (pgdat->proactive_compact_trigger) {
+			pgdat->proactive_compact_trigger = false;
+		}
+
+		threshold = compaction_proactiveness_score_threshold();
+		score = fragmentation_score_node(pgdat);
+		should_compact = (score > threshold) ||
+				 (pgdat->kcompactd_max_order > 0);
+
+		if (!should_compact)
+			continue;
 
 		psi_memstall_enter(&pflags);
 		kcompactd_do_work(pgdat);

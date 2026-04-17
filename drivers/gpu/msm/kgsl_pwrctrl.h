@@ -72,6 +72,7 @@
 
 enum kgsl_pwrctrl_timer_type {
 	KGSL_PWR_IDLE_TIMER,
+	KGSL_PWR_SLUMBER_TIMER,
 };
 
 /*
@@ -203,6 +204,7 @@ struct kgsl_pwrctrl {
 	unsigned int num_pwrlevels;
 	unsigned int throttle_mask;
 	unsigned long interval_timeout;
+	unsigned long slumber_timeout;
 	u64 clock_times[KGSL_MAX_PWRLEVELS];
 	struct kgsl_regulator regulators[KGSL_MAX_REGULATORS];
 	uint32_t pcl;

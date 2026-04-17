@@ -973,6 +973,8 @@ static ssize_t __timer_store(struct device *dev, struct device_attribute *attr,
 	/* Let the timeout be requested in ms, but convert to jiffies. */
 	if (timer == KGSL_PWR_IDLE_TIMER)
 		device->pwrctrl.interval_timeout = msecs_to_jiffies(val);
+	else if (timer == KGSL_PWR_SLUMBER_TIMER)
+		device->pwrctrl.slumber_timeout = msecs_to_jiffies(val);
 
 	mutex_unlock(&device->mutex);
 
@@ -997,6 +999,26 @@ static ssize_t kgsl_pwrctrl_idle_timer_show(struct device *dev,
 	/* Show the idle_timeout converted to msec */
 	return snprintf(buf, PAGE_SIZE, "%u\n",
 		jiffies_to_msecs(device->pwrctrl.interval_timeout));
+}
+
+static ssize_t kgsl_pwrctrl_slumber_timer_store(struct device *dev,
+					struct device_attribute *attr,
+					const char *buf, size_t count)
+{
+	return __timer_store(dev, attr, buf, count, KGSL_PWR_SLUMBER_TIMER);
+}
+
+static ssize_t kgsl_pwrctrl_slumber_timer_show(struct device *dev,
+					struct device_attribute *attr,
+					char *buf)
+{
+	struct kgsl_device *device = kgsl_device_from_dev(dev);
+
+	if (device == NULL)
+		return 0;
+	/* Show the slumber_timeout converted to msec */
+	return snprintf(buf, PAGE_SIZE, "%u\n",
+		jiffies_to_msecs(device->pwrctrl.slumber_timeout));
 }
 
 static ssize_t kgsl_pwrctrl_pmqos_active_latency_store(struct device *dev,
@@ -1579,6 +1601,8 @@ static DEVICE_ATTR(max_gpuclk, 0644, kgsl_pwrctrl_max_gpuclk_show,
 	kgsl_pwrctrl_max_gpuclk_store);
 static DEVICE_ATTR(idle_timer, 0644, kgsl_pwrctrl_idle_timer_show,
 	kgsl_pwrctrl_idle_timer_store);
+static DEVICE_ATTR(slumber_timer, 0644, kgsl_pwrctrl_slumber_timer_show,
+	kgsl_pwrctrl_slumber_timer_store);
 static DEVICE_ATTR(gpubusy, 0444, kgsl_pwrctrl_gpubusy_show,
 	NULL);
 static DEVICE_ATTR(gpu_available_frequencies, 0444,
@@ -1642,6 +1666,7 @@ static const struct device_attribute *pwrctrl_attr_list[] = {
 	&dev_attr_gpuclk,
 	&dev_attr_max_gpuclk,
 	&dev_attr_idle_timer,
+	&dev_attr_slumber_timer,
 	&dev_attr_gpubusy,
 	&dev_attr_gpu_available_frequencies,
 	&dev_attr_gpu_clock_stats,
@@ -2996,6 +3021,20 @@ _nap(struct kgsl_device *device)
 
 		kgsl_pwrctrl_clk(device, KGSL_PWRFLAGS_OFF, KGSL_STATE_NAP);
 		kgsl_pwrctrl_set_state(device, KGSL_STATE_NAP);
+		/*
+		 * Re-arm the idle timer using slumber_timeout so that
+		 * the NAP → SLUMBER transition can be tuned independently
+		 * of the ACTIVE → NAP transition.  If slumber_timeout is
+		 * zero, fall back to interval_timeout.
+		 */
+		{
+			unsigned long slumber_jiff =
+				device->pwrctrl.slumber_timeout ?
+				device->pwrctrl.slumber_timeout :
+				device->pwrctrl.interval_timeout;
+			mod_timer(&device->idle_timer,
+				  jiffies + slumber_jiff);
+		}
 		/* fallthrough */
 	case KGSL_STATE_SLUMBER:
 	case KGSL_STATE_RESET:

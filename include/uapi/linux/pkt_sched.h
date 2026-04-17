@@ -806,6 +806,14 @@ enum {
 
 	TCA_FQ_LOW_RATE_THRESHOLD, /* per packet delay under this rate */
 
+	TCA_FQ_CE_THRESHOLD,	/* DCTCP-like CE-marking threshold */
+
+	TCA_FQ_TIMER_SLACK,	/* timer slack */
+
+	TCA_FQ_HORIZON,		/* time horizon in us */
+
+	TCA_FQ_HORIZON_DROP,	/* drop packets beyond horizon, or just throttle */
+
 	__TCA_FQ_MAX
 };
 

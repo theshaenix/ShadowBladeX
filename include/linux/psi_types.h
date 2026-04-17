@@ -139,7 +139,8 @@ struct psi_group {
 
 	/* Total stall times and sampled pressure averages */
 	u64 total[NR_PSI_AGGREGATORS][NR_PSI_STATES - 1];
-	unsigned long avg[NR_PSI_STATES - 1][3];
+	/* avg[state][0..3]: avg10s, avg60s, avg300s, avg1s windows */
+	unsigned long avg[NR_PSI_STATES - 1][4];
 
 	/* Monitor work control */
 	atomic_t poll_scheduled;

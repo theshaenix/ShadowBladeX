@@ -155,6 +155,10 @@ int sysctl_ed_task_enabled = 1;
 #endif
 
 static int one_thousand = 1000;
+static int twenty_thousand = 20000;
+extern int watermark_boost_factor;
+extern int watermark_boost_factor_sysctl_handler(struct ctl_table *table,
+	int write, void __user *buffer, size_t *length, loff_t *ppos);
 #ifdef CONFIG_SCHED_WALT
 static int two_million = 2000000;
 #endif
@@ -1945,6 +1949,15 @@ static struct ctl_table vm_table[] = {
 		.extra1		= &zero,
 		.extra2		= &one,
 	},
+	{
+		.procname	= "compaction_proactiveness",
+		.data		= &sysctl_compaction_proactiveness,
+		.maxlen		= sizeof(sysctl_compaction_proactiveness),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one_hundred,
+	},
 
 #endif /* CONFIG_COMPACTION */
 	{
@@ -1974,6 +1987,15 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= watermark_scale_factor_sysctl_handler,
 		.extra1		= &one,
 		.extra2		= &one_thousand,
+	},
+	{
+		.procname	= "watermark_boost_factor",
+		.data		= &watermark_boost_factor,
+		.maxlen		= sizeof(watermark_boost_factor),
+		.mode		= 0644,
+		.proc_handler	= watermark_boost_factor_sysctl_handler,
+		.extra1		= &zero,
+		.extra2		= &twenty_thousand,
 	},
 	{
 		.procname	= "extra_free_kbytes",
