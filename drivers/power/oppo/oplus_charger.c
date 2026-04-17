@@ -1673,17 +1673,7 @@ static ssize_t bypass_charging_read(struct file *filp,
 	/* bypass mode maps to the driver's charging-disabled state */
 	bypass_en = (chip->mmi_chg == 0 && chip->stop_chg == 0) ? 1 : 0;
 	len = snprintf(page, sizeof(page), "%d\n", bypass_en);
-	if (len > *off) {
-		len -= *off;
-	} else {
-		len = 0;
-	}
-
-	if (copy_to_user(buff, page, (len < count ? len : count))) {
-		return -EFAULT;
-	}
-	*off += len < count ? len : count;
-	return (len < count ? len : count);
+	return simple_read_from_buffer(buff, count, off, page, len);
 }
 
 static ssize_t bypass_charging_write(struct file *filp,
@@ -1699,7 +1689,7 @@ static ssize_t bypass_charging_write(struct file *filp,
 	if (len == 0) {
 		return -EINVAL;
 	}
-	if (len >= sizeof(temp)) {
+	if (len >= (sizeof(temp) - 1)) {
 		return -EINVAL;
 	}
 	if (copy_from_user(temp, buff, len)) {
@@ -1731,16 +1721,7 @@ static ssize_t charging_powersave_read(struct file *filp,
 	}
 
 	len = snprintf(page, sizeof(page), "%d\n", chip->chg_powersave ? 1 : 0);
-	if (len > *off) {
-		len -= *off;
-	} else {
-		len = 0;
-	}
-	if (copy_to_user(buff, page, (len < count ? len : count))) {
-		return -EFAULT;
-	}
-	*off += len < count ? len : count;
-	return (len < count ? len : count);
+	return simple_read_from_buffer(buff, count, off, page, len);
 }
 
 static ssize_t charging_powersave_write(struct file *filp,
@@ -1756,7 +1737,7 @@ static ssize_t charging_powersave_write(struct file *filp,
 	if (len == 0) {
 		return -EINVAL;
 	}
-	if (len >= sizeof(temp)) {
+	if (len >= (sizeof(temp) - 1)) {
 		return -EINVAL;
 	}
 	if (copy_from_user(temp, buff, len)) {
@@ -1791,16 +1772,7 @@ static ssize_t input_current_limit_ma_read(struct file *filp,
 		       chip->limits.input_current_led_ma_high,
 		       chip->limits.input_current_led_ma_warm,
 		       chip->limits.input_current_led_ma_normal);
-	if (len > *off) {
-		len -= *off;
-	} else {
-		len = 0;
-	}
-	if (copy_to_user(buff, page, (len < count ? len : count))) {
-		return -EFAULT;
-	}
-	*off += len < count ? len : count;
-	return (len < count ? len : count);
+	return simple_read_from_buffer(buff, count, off, page, len);
 }
 
 static ssize_t input_current_limit_ma_write(struct file *filp,
@@ -1816,7 +1788,7 @@ static ssize_t input_current_limit_ma_write(struct file *filp,
 	if (len == 0) {
 		return -EINVAL;
 	}
-	if (len >= sizeof(temp)) {
+	if (len >= (sizeof(temp) - 1)) {
 		return -EINVAL;
 	}
 	if (copy_from_user(temp, buff, len)) {
