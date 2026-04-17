@@ -79,10 +79,10 @@ jobs:
           ACTOR: ${{ github.actor }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null || echo "(unavailable)")
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null | head -c 200 || echo "(unavailable)")
           BUILD_DATE=$(date -u "+%Y-%m-%d %H:%M UTC")
           FILE_SIZE=$(du -sh "${ZIP_PATH}" | cut -f1)
-          escape_html() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'; }
+          escape_html() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
           CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>By:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
             "$(escape_html "${BRANCH_NAME}")" \
             "${SHORT_SHA}" \
