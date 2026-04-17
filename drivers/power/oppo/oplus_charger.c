@@ -1619,12 +1619,15 @@ static const struct file_operations chg_ctl_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
+#define OPLUS_CHG_MIN_FMK_INPUT_CURRENT_MA 300
+
 static void oplus_chg_set_bypass_charging(struct oplus_chg_chip *chip, bool enable)
 {
 	if (!chip || !chip->chg_ops || !chip->chg_ops->charging_disable
 			|| !chip->chg_ops->charging_enable
 			|| !chip->chg_ops->charger_suspend
 			|| !chip->chg_ops->charger_unsuspend) {
+		chg_err("invalid charger ops for bypass control\n");
 		return;
 	}
 
@@ -1667,6 +1670,7 @@ static ssize_t bypass_charging_read(struct file *filp,
 		return -EFAULT;
 	}
 
+	/* bypass mode maps to the driver's charging-disabled state */
 	bypass_en = (chip->mmi_chg == 0 && chip->stop_chg == 0) ? 1 : 0;
 	len = snprintf(page, sizeof(page), "%d\n", bypass_en);
 	if (len > *off) {
@@ -1820,8 +1824,8 @@ static ssize_t input_current_limit_ma_write(struct file *filp,
 		return -EINVAL;
 	}
 	/* keep floor conservative to avoid invalid/too-low USB input settings */
-	if (limit_current < 300) {
-		limit_current = 300;
+	if (limit_current < OPLUS_CHG_MIN_FMK_INPUT_CURRENT_MA) {
+		limit_current = OPLUS_CHG_MIN_FMK_INPUT_CURRENT_MA;
 	}
 
 	chip->limits.input_current_led_ma_high = limit_current;
@@ -1904,7 +1908,7 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 			  __LINE__);
 	}
 
-	prEntry_tmp = proc_create_data("bypass_charging", 0644, prEntry_da,
+	prEntry_tmp = proc_create_data("bypass_charging", 0600, prEntry_da,
 				       &bypass_charging_proc_fops, chip);
 	if (prEntry_tmp == NULL) {
 		ret = -1;
@@ -1912,7 +1916,7 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 			  __func__, __LINE__);
 	}
 
-	prEntry_tmp = proc_create_data("charging_powersave", 0644, prEntry_da,
+	prEntry_tmp = proc_create_data("charging_powersave", 0600, prEntry_da,
 				       &charging_powersave_proc_fops, chip);
 	if (prEntry_tmp == NULL) {
 		ret = -1;
@@ -1920,7 +1924,7 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 			  __func__, __LINE__);
 	}
 
-	prEntry_tmp = proc_create_data("input_current_limit_ma", 0644, prEntry_da,
+	prEntry_tmp = proc_create_data("input_current_limit_ma", 0600, prEntry_da,
 				       &input_current_limit_ma_proc_fops, chip);
 	if (prEntry_tmp == NULL) {
 		ret = -1;
