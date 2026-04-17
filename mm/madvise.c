@@ -23,6 +23,7 @@
 #include <linux/swap.h>
 #include <linux/swapops.h>
 #include <linux/shmem_fs.h>
+#include <linux/mm_inline.h>
 #include <linux/mmu_notifier.h>
 #include <linux/rmap.h>
 #include <linux/vmstat.h>
