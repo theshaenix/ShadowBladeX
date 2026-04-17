@@ -74,7 +74,7 @@ jobs:
           path: ${{ steps.artifact.outputs.zip_path }}
 
       - name: Upload to Telegram
-        if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        if: ${{ github.event_name != 'pull_request' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
         env:
           BRANCH_NAME: ${{ github.ref_name }}
           ACTOR: ${{ github.actor }}

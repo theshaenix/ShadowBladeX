@@ -97,7 +97,7 @@ static struct oplus_chg_chip *g_charger_chip = NULL;
 
 #define OPLUS_CHG_DEFAULT_CHARGING_CURRENT	512
 
-int enable_charger_log = 2;
+int enable_charger_log = 1;
 int charger_abnormal_log = 0;
 int tbatt_pwroff_enable = 1;
 static int mcu_status = 0;
@@ -1619,6 +1619,203 @@ static const struct file_operations chg_ctl_proc_fops = {
 	.owner = THIS_MODULE,
 };
 
+#define OPLUS_CHG_MIN_FMK_INPUT_CURRENT_MA 300
+
+static void oplus_chg_set_bypass_charging(struct oplus_chg_chip *chip, bool enable)
+{
+	if (!chip || !chip->chg_ops || !chip->chg_ops->charging_disable
+			|| !chip->chg_ops->charging_enable
+			|| !chip->chg_ops->charger_suspend
+			|| !chip->chg_ops->charger_unsuspend) {
+		chg_err("invalid charger ops for bypass control\n");
+		return;
+	}
+
+	if (enable) {
+		chip->chg_ops->charging_disable();
+		chip->chg_ops->charger_suspend();
+		chip->mmi_chg = 0;
+		/* stop_chg==0 is used by this driver's discharging/bypass path */
+		chip->stop_chg = 0;
+		chip->prop_status = POWER_SUPPLY_STATUS_NOT_CHARGING;
+		if (oplus_vooc_get_fastchg_started() == true) {
+			oplus_vooc_turn_off_fastchg();
+			chip->mmi_fastchg = 0;
+		}
+	} else {
+		chip->unwakelock_chg = 0;
+		chip->chg_ops->charger_unsuspend();
+		chip->chg_ops->charging_enable();
+		chip->mmi_chg = 1;
+		chip->stop_chg = 1;
+		chip->prop_status = POWER_SUPPLY_STATUS_CHARGING;
+		chip->batt_full = false;
+		oplus_chg_set_input_current_limit(chip);
+	}
+
+	cancel_delayed_work_sync(&chip->update_work);
+	schedule_delayed_work(&chip->update_work,
+		round_jiffies_relative(msecs_to_jiffies(1500)));
+}
+
+static ssize_t bypass_charging_read(struct file *filp,
+		char __user *buff, size_t count, loff_t *off)
+{
+	struct oplus_chg_chip *chip = g_charger_chip;
+	char page[16] = {0};
+	int len = 0;
+	int bypass_en;
+
+	if (!chip) {
+		return -EFAULT;
+	}
+
+	/* bypass mode maps to the driver's charging-disabled state */
+	bypass_en = (chip->mmi_chg == 0 && chip->stop_chg == 0) ? 1 : 0;
+	len = snprintf(page, sizeof(page), "%d\n", bypass_en);
+	return simple_read_from_buffer(buff, count, off, page, len);
+}
+
+static ssize_t bypass_charging_write(struct file *filp,
+		const char __user *buff, size_t len, loff_t *data)
+{
+	struct oplus_chg_chip *chip = g_charger_chip;
+	char temp[16] = {0};
+	int bypass_en = 0;
+
+	if (!chip) {
+		return -EFAULT;
+	}
+	if (len == 0) {
+		return -EINVAL;
+	}
+	if (len >= (sizeof(temp) - 1)) {
+		return -EINVAL;
+	}
+	if (copy_from_user(temp, buff, len)) {
+		return -EFAULT;
+	}
+	temp[len] = '\0';
+	if (kstrtoint(temp, 0, &bypass_en)) {
+		return -EINVAL;
+	}
+	oplus_chg_set_bypass_charging(chip, bypass_en ? true : false);
+	return len;
+}
+
+static const struct file_operations bypass_charging_proc_fops = {
+	.read = bypass_charging_read,
+	.write = bypass_charging_write,
+	.owner = THIS_MODULE,
+};
+
+static ssize_t charging_powersave_read(struct file *filp,
+		char __user *buff, size_t count, loff_t *off)
+{
+	struct oplus_chg_chip *chip = g_charger_chip;
+	char page[16] = {0};
+	int len = 0;
+
+	if (!chip) {
+		return -EFAULT;
+	}
+
+	len = snprintf(page, sizeof(page), "%d\n", chip->chg_powersave ? 1 : 0);
+	return simple_read_from_buffer(buff, count, off, page, len);
+}
+
+static ssize_t charging_powersave_write(struct file *filp,
+		const char __user *buff, size_t len, loff_t *data)
+{
+	struct oplus_chg_chip *chip = g_charger_chip;
+	char temp[16] = {0};
+	int powersave = 0;
+
+	if (!chip) {
+		return -EFAULT;
+	}
+	if (len == 0) {
+		return -EINVAL;
+	}
+	if (len >= (sizeof(temp) - 1)) {
+		return -EINVAL;
+	}
+	if (copy_from_user(temp, buff, len)) {
+		return -EFAULT;
+	}
+	temp[len] = '\0';
+	if (kstrtoint(temp, 0, &powersave)) {
+		return -EINVAL;
+	}
+	chip->chg_powersave = powersave ? true : false;
+	return len;
+}
+
+static const struct file_operations charging_powersave_proc_fops = {
+	.read = charging_powersave_read,
+	.write = charging_powersave_write,
+	.owner = THIS_MODULE,
+};
+
+static ssize_t input_current_limit_ma_read(struct file *filp,
+		char __user *buff, size_t count, loff_t *off)
+{
+	struct oplus_chg_chip *chip = g_charger_chip;
+	char page[64] = {0};
+	int len = 0;
+
+	if (!chip) {
+		return -EFAULT;
+	}
+
+	len = snprintf(page, sizeof(page), "%d\n%d\n%d\n",
+		       chip->limits.input_current_led_ma_high,
+		       chip->limits.input_current_led_ma_warm,
+		       chip->limits.input_current_led_ma_normal);
+	return simple_read_from_buffer(buff, count, off, page, len);
+}
+
+static ssize_t input_current_limit_ma_write(struct file *filp,
+		const char __user *buff, size_t len, loff_t *data)
+{
+	struct oplus_chg_chip *chip = g_charger_chip;
+	char temp[16] = {0};
+	int limit_current = 0;
+
+	if (!chip) {
+		return -EFAULT;
+	}
+	if (len == 0) {
+		return -EINVAL;
+	}
+	if (len >= (sizeof(temp) - 1)) {
+		return -EINVAL;
+	}
+	if (copy_from_user(temp, buff, len)) {
+		return -EFAULT;
+	}
+	temp[len] = '\0';
+	if (kstrtoint(temp, 0, &limit_current)) {
+		return -EINVAL;
+	}
+	/* keep floor conservative to avoid invalid/too-low USB input settings */
+	if (limit_current < OPLUS_CHG_MIN_FMK_INPUT_CURRENT_MA) {
+		limit_current = OPLUS_CHG_MIN_FMK_INPUT_CURRENT_MA;
+	}
+
+	chip->limits.input_current_led_ma_high = limit_current;
+	chip->limits.input_current_led_ma_warm = limit_current;
+	chip->limits.input_current_led_ma_normal = limit_current;
+	oplus_chg_set_input_current_limit(chip);
+	return len;
+}
+
+static const struct file_operations input_current_limit_ma_proc_fops = {
+	.read = input_current_limit_ma_read,
+	.write = input_current_limit_ma_write,
+	.owner = THIS_MODULE,
+};
+
 static int init_charger_proc(struct oplus_chg_chip *chip)
 {
 	int ret = 0;
@@ -1684,6 +1881,30 @@ static int init_charger_proc(struct oplus_chg_chip *chip)
 		ret = -1;
 		chg_debug("%s: Couldn't create chg_ctl proc entry, %d\n", __func__,
 			  __LINE__);
+	}
+
+	prEntry_tmp = proc_create_data("bypass_charging", 0600, prEntry_da,
+				       &bypass_charging_proc_fops, chip);
+	if (prEntry_tmp == NULL) {
+		ret = -1;
+		chg_debug("%s: Couldn't create bypass_charging proc entry, %d\n",
+			  __func__, __LINE__);
+	}
+
+	prEntry_tmp = proc_create_data("charging_powersave", 0600, prEntry_da,
+				       &charging_powersave_proc_fops, chip);
+	if (prEntry_tmp == NULL) {
+		ret = -1;
+		chg_debug("%s: Couldn't create charging_powersave proc entry, %d\n",
+			  __func__, __LINE__);
+	}
+
+	prEntry_tmp = proc_create_data("input_current_limit_ma", 0600, prEntry_da,
+				       &input_current_limit_ma_proc_fops, chip);
+	if (prEntry_tmp == NULL) {
+		ret = -1;
+		chg_debug("%s: Couldn't create input_current_limit_ma proc entry, %d\n",
+			  __func__, __LINE__);
 	}
 	return 0;
 }
@@ -8511,4 +8732,3 @@ int oplus_chg_match_temp_for_chging(void)
 						batt_temp, shell_temp, chging_temp);
 	return chging_temp;
 }
-
