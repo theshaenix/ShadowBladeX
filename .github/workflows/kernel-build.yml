@@ -72,10 +72,25 @@ jobs:
 
       - name: Upload to Telegram
         if: ${{ env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        env:
+          ZIP_NAME: ${{ steps.artifact.outputs.zip_name }}
+          ZIP_PATH: ${{ steps.artifact.outputs.zip_path }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          printf -v CAPTION $'Kernel build: %s\nCommit: %s' "${{ steps.artifact.outputs.zip_name }}" "${SHORT_SHA}"
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+          AUTHOR=$(git log -1 --pretty=format:"%an")
+          BUILD_DATE=$(date -u "+%Y-%m-%d %H:%M UTC")
+          FILE_SIZE=$(du -sh "${ZIP_PATH}" | cut -f1)
+          CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>Author:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
+            "${{ github.ref_name }}" \
+            "${SHORT_SHA}" \
+            "${COMMIT_MSG}" \
+            "${AUTHOR}" \
+            "${BUILD_DATE}" \
+            "${FILE_SIZE}" \
+            "${ZIP_NAME}")
           curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
             -F chat_id="${TELEGRAM_CHAT_ID}" \
-            -F document=@"${{ steps.artifact.outputs.zip_path }}" \
-            -F caption="${CAPTION}"
+            -F document=@"${ZIP_PATH}" \
+            -F caption="${CAPTION}" \
+            -F parse_mode="HTML"
