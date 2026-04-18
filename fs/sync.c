@@ -235,10 +235,6 @@ static int do_fsync(unsigned int fd, int datasync)
 {
 	struct fd f = fdget(fd);
 	int ret = -EBADF;
-#ifdef CONFIG_DYN_FSYNC
-	if (dyn_fsync_active())
-		return 0;
-#endif
 #ifdef OPLUS_FEATURE_HEALTHINFO
 // wenbin.liu@PSW.BSP.MM, 2018/08/06
 // Add for record  fsync  time
@@ -246,6 +242,10 @@ static int do_fsync(unsigned int fd, int datasync)
     unsigned long fsync_time = jiffies;
 #endif
 #endif /* OPLUS_FEATURE_HEALTHINFO */
+#ifdef CONFIG_DYN_FSYNC
+	if (dyn_fsync_active())
+		return 0;
+#endif
 	if (f.file) {
 		ret = vfs_fsync(f.file, datasync);
 		fdput(f);
