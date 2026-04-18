@@ -213,6 +213,77 @@ config CPU_BOOST
 
 	  If in doubt, say N.
 
+config CPU_INPUT_BOOST
+	bool "CPU input/wake boost for SM7125 (atoll)"
+	depends on CPU_FREQ && INPUT
+	help
+	  Boosts CPU frequency for each cluster on touch/key input events
+	  and on display wake-up to reduce latency. Parameters are exposed
+	  at /sys/module/cpu_input_boost/parameters/ and are accessible
+	  by FrancoKernel Manager.
+
+	  If in doubt, say N.
+
+if CPU_INPUT_BOOST
+
+config INPUT_BOOST_DURATION_MS
+	int "Input event boost duration (ms)"
+	default 50
+	help
+	  Duration in milliseconds for which the CPU frequency is boosted
+	  after a touch or key input event.
+
+config WAKE_BOOST_DURATION_MS
+	int "Display wake boost duration (ms)"
+	default 1000
+	help
+	  Duration in milliseconds for which the CPU frequency is maximally
+	  boosted when the display wakes up.
+
+config INPUT_BOOST_FREQ_LP
+	int "Input boost frequency for little cluster (kHz)"
+	default 1267200
+	help
+	  Minimum CPU frequency applied to the little (LP) cluster during
+	  an input boost.
+
+config INPUT_BOOST_FREQ_PERF
+	int "Input boost frequency for big cluster (kHz)"
+	default 1574400
+	help
+	  Minimum CPU frequency applied to the big (PERF) cluster during
+	  an input boost.
+
+config MAX_BOOST_FREQ_LP
+	int "Wake boost frequency for little cluster (kHz)"
+	default 1708800
+	help
+	  Maximum CPU frequency applied to the little (LP) cluster during
+	  a display wake boost.
+
+config MAX_BOOST_FREQ_PERF
+	int "Wake boost frequency for big cluster (kHz)"
+	default 2361600
+	help
+	  Maximum CPU frequency applied to the big (PERF) cluster during
+	  a display wake boost.
+
+config MIN_FREQ_LP
+	int "Persistent minimum frequency for little cluster (kHz, 0=off)"
+	default 0
+	help
+	  A permanent cpufreq minimum for the little cluster. Set 0 to
+	  disable (use the hardware default floor).
+
+config MIN_FREQ_PERF
+	int "Persistent minimum frequency for big cluster (kHz, 0=off)"
+	default 0
+	help
+	  A permanent cpufreq minimum for the big cluster. Set 0 to
+	  disable (use the hardware default floor).
+
+endif # CPU_INPUT_BOOST
+
 config CPU_FREQ_GOV_SCHEDUTIL
 	bool "'schedutil' cpufreq policy governor"
 	depends on CPU_FREQ && SMP

@@ -16,6 +16,9 @@
 #include <linux/pagemap.h>
 #include <linux/quotaops.h>
 #include <linux/backing-dev.h>
+#ifdef CONFIG_DYN_FSYNC
+#include <linux/dyn_fsync.h>
+#endif
 #include "internal.h"
 
 #ifdef OPLUS_FEATURE_HEALTHINFO
@@ -122,6 +125,10 @@ SYSCALL_DEFINE0(sync)
 {
 	int nowait = 0, wait = 1;
 
+#ifdef CONFIG_DYN_FSYNC
+	if (dyn_fsync_active())
+		return 0;
+#endif
 	wakeup_flusher_threads(0, WB_REASON_SYNC);
 	iterate_supers(sync_inodes_one_sb, NULL);
 	iterate_supers(sync_fs_one_sb, &nowait);
@@ -228,6 +235,10 @@ static int do_fsync(unsigned int fd, int datasync)
 {
 	struct fd f = fdget(fd);
 	int ret = -EBADF;
+#ifdef CONFIG_DYN_FSYNC
+	if (dyn_fsync_active())
+		return 0;
+#endif
 #ifdef OPLUS_FEATURE_HEALTHINFO
 // wenbin.liu@PSW.BSP.MM, 2018/08/06
 // Add for record  fsync  time

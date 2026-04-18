@@ -1109,6 +1109,9 @@ CONFIG_BOEFFLA_WL_BLOCKER=y
 #Enable Kernel Space battery saver
 CONFIG_BATTERY_SAVER=y
 
+#Dynamic fsync - skip sync while display is on
+CONFIG_DYN_FSYNC=y
+
 #
 # Power management options
 #

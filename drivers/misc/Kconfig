@@ -614,6 +614,18 @@ config FORCE_FAST_CHARGE
 	help
 	  This allows users to override default charge rate for USB
 
+config DYN_FSYNC
+	bool "Dynamic fsync - skip sync while display is on"
+	default y
+	help
+	  When enabled, userspace sync/fsync/fdatasync calls are skipped
+	  while the display is on, reducing I/O latency during active use.
+	  Dirty data is safely flushed when the display turns off.
+	  The toggle is accessible at /sys/kernel/dyn_fsync/dyn_fsync_active
+	  and is read/writable by FrancoKernel Manager.
+
+	  If in doubt, say N.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
