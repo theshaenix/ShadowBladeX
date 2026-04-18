@@ -15,6 +15,7 @@
 #include <linux/cpufreq.h>
 #include <linux/input.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/msm_drm_notify.h>
 #include <linux/slab.h>
