@@ -21,8 +21,8 @@
 #include <linux/workqueue.h>
 
 /* Mask bits for cluster classification */
-#define CPU_IS_LP(cpu)	(BIT(cpu) & CONFIG_LITTLE_CPU_MASK)
-#define CPU_IS_PERF(cpu)	(BIT(cpu) & CONFIG_BIG_CPU_MASK)
+#define CPU_IS_LITTLE(cpu)	(BIT(cpu) & CONFIG_LITTLE_CPU_MASK)
+#define CPU_IS_BIG(cpu)		(BIT(cpu) & CONFIG_BIG_CPU_MASK)
 
 enum boost_state {
 	BOOST_IDLE,
@@ -81,9 +81,9 @@ static void set_boost_min_for_cluster(unsigned int freq_lp,
 
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
-		if (CPU_IS_LP(cpu))
+		if (CPU_IS_LITTLE(cpu))
 			per_cpu(boost_min, cpu) = freq_lp;
-		else if (CPU_IS_PERF(cpu))
+		else if (CPU_IS_BIG(cpu))
 			per_cpu(boost_min, cpu) = freq_perf;
 	}
 	put_online_cpus();
@@ -106,9 +106,9 @@ static void clear_boost(struct work_struct *work)
 	/* Clear per-CPU boost mins */
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
-		if (CPU_IS_LP(cpu))
+		if (CPU_IS_LITTLE(cpu))
 			per_cpu(boost_min, cpu) = min_freq_lp;
-		else if (CPU_IS_PERF(cpu))
+		else if (CPU_IS_BIG(cpu))
 			per_cpu(boost_min, cpu) = min_freq_perf;
 	}
 	put_online_cpus();
@@ -273,9 +273,9 @@ static int __init cpu_input_boost_init(void)
 	/* Initialise per-CPU min to configured static minimums */
 	get_online_cpus();
 	for_each_online_cpu(cpu) {
-		if (CPU_IS_LP(cpu))
+		if (CPU_IS_LITTLE(cpu))
 			per_cpu(boost_min, cpu) = min_freq_lp;
-		else if (CPU_IS_PERF(cpu))
+		else if (CPU_IS_BIG(cpu))
 			per_cpu(boost_min, cpu) = min_freq_perf;
 	}
 	put_online_cpus();
