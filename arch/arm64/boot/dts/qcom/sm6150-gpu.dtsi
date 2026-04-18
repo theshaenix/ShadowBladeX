@@ -43,7 +43,7 @@
 
 		qcom,chipid = <0x06010200>;
 
-		qcom,initial-pwrlevel = <5>;
+		qcom,initial-pwrlevel = <3>;
 
 		/* <HZ/12> */
 		qcom,idle-timeout = <80>;
@@ -114,7 +114,7 @@
 		/* Context aware jump busy penalty in us */
 		qcom,ca-busy-penalty = <12000>;
 		/* Context aware jump target power level */
-		qcom,ca-target-pwrlevel = <3>;
+		qcom,ca-target-pwrlevel = <2>;
 
 		qcom,gpu-speed-bin = <0x6004 0x1fe00000 21>;
 
@@ -168,8 +168,8 @@
 
 				qcom,speed-bin = <0>;
 
-				qcom,initial-pwrlevel = <5>;
-				qcom,ca-target-pwrlevel = <3>;
+				qcom,initial-pwrlevel = <3>;
+				qcom,ca-target-pwrlevel = <2>;
 
 				/* TURBO */
 				qcom,gpu-pwrlevel@0 {
@@ -241,8 +241,8 @@
 
 				qcom,speed-bin = <177>;
 
-				qcom,initial-pwrlevel = <5>;
-				qcom,ca-target-pwrlevel = <3>;
+				qcom,initial-pwrlevel = <3>;
+				qcom,ca-target-pwrlevel = <2>;
 
 				/* TURBO */
 				qcom,gpu-pwrlevel@0 {
@@ -314,8 +314,8 @@
 
 				qcom,speed-bin = <187>;
 
-				qcom,initial-pwrlevel = <6>;
-				qcom,ca-target-pwrlevel = <4>;
+				qcom,initial-pwrlevel = <4>;
+				qcom,ca-target-pwrlevel = <3>;
 
 				/* TURBO L1 */
 				qcom,gpu-pwrlevel@0 {
@@ -395,8 +395,8 @@
 
 				qcom,speed-bin = <156>;
 
-				qcom,initial-pwrlevel = <4>;
-				qcom,ca-target-pwrlevel = <2>;
+				qcom,initial-pwrlevel = <2>;
+				qcom,ca-target-pwrlevel = <1>;
 
 				/* NOM L1 */
 				qcom,gpu-pwrlevel@0 {
@@ -459,8 +459,8 @@
 
 				qcom,speed-bin = <136>;
 
-				qcom,initial-pwrlevel = <3>;
-				qcom,ca-target-pwrlevel = <1>;
+				qcom,initial-pwrlevel = <1>;
+				qcom,ca-target-pwrlevel = <0>;
 
 				/* NOM */
 				qcom,gpu-pwrlevel@0 {
