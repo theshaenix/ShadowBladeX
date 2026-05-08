@@ -1909,22 +1909,21 @@ int __pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address);
 
 static inline void mm_nr_pmds_init(struct mm_struct *mm)
 {
-	atomic_long_set(&mm->nr_pmds, 0);
 }
 
 static inline unsigned long mm_nr_pmds(struct mm_struct *mm)
 {
-	return atomic_long_read(&mm->nr_pmds);
+	return 0;
 }
 
 static inline void mm_inc_nr_pmds(struct mm_struct *mm)
 {
-	atomic_long_inc(&mm->nr_pmds);
+	atomic_long_add(PTRS_PER_PMD * sizeof(pmd_t), &mm->pgtables_bytes);
 }
 
 static inline void mm_dec_nr_pmds(struct mm_struct *mm)
 {
-	atomic_long_dec(&mm->nr_pmds);
+	atomic_long_sub(PTRS_PER_PMD * sizeof(pmd_t), &mm->pgtables_bytes);
 }
 #endif
 

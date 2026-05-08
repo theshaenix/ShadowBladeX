@@ -574,6 +574,7 @@ struct pid *task_pid_type(struct task_struct *task, enum pid_type type)
 	return pid;
 }
 
+#ifndef TASK_PID_HELPERS_DEFINED
 static inline struct pid *task_tgid(struct task_struct *task)
 {
 	return task->signal->pids[PIDTYPE_TGID];
@@ -593,6 +594,7 @@ static inline struct pid *task_session(struct task_struct *task)
 {
 	return task->signal->pids[PIDTYPE_SID];
 }
+#endif
 
 static inline int get_nr_threads(struct task_struct *tsk)
 {
