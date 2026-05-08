@@ -395,6 +395,7 @@ struct mm_struct {
 
 #ifdef CONFIG_MMU
 	atomic_long_t pgtables_bytes;		/* PTE page table pages */
+	atomic_long_t nr_pmds;
 #endif
 	int map_count;				/* number of VMAs */
 
