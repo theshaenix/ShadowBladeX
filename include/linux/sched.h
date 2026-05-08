@@ -1467,30 +1467,9 @@ struct task_struct {
 	 */
 };
 
-#define TASK_PID_HELPERS_DEFINED
 static inline struct pid *task_pid(struct task_struct *task)
 {
 	return task->thread_pid;
-}
-
-static inline struct pid *task_tgid(struct task_struct *task)
-{
-	return task->signal->pids[PIDTYPE_TGID];
-}
-
-/*
- * Without tasklist or RCU lock it is not safe to dereference
- * the result of task_pgrp/task_session even if task == current,
- * we can race with another thread doing sys_setsid/sys_setpgid.
- */
-static inline struct pid *task_pgrp(struct task_struct *task)
-{
-	return task->signal->pids[PIDTYPE_PGID];
-}
-
-static inline struct pid *task_session(struct task_struct *task)
-{
-	return task->signal->pids[PIDTYPE_SID];
 }
 
 /*
