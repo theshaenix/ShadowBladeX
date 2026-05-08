@@ -668,11 +668,8 @@ int dup_userfaultfd(struct vm_area_struct *vma, struct list_head *fcs)
 
 	octx = vma->vm_userfaultfd_ctx.ctx;
 	if (!octx || !(octx->features & UFFD_FEATURE_EVENT_FORK)) {
-		vm_write_begin(vma);
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
-		WRITE_ONCE(vma->vm_flags,
-			   vma->vm_flags & ~__VM_UFFD_FLAGS);
-		vm_write_end(vma);
+		vma->vm_flags &= ~__VM_UFFD_FLAGS;
 		return 0;
 	}
 
@@ -911,10 +908,8 @@ static int userfaultfd_release(struct inode *inode, struct file *file)
 			else
 				prev = vma;
 		}
-		vm_write_begin(vma);
-		WRITE_ONCE(vma->vm_flags, new_flags);
+		vma->vm_flags = new_flags;
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
-		vm_write_end(vma);
 	}
 	up_write(&mm->mmap_sem);
 	mmput(mm);
@@ -1500,10 +1495,8 @@ static int userfaultfd_register(struct userfaultfd_ctx *ctx,
 		 * the next vma was merged into the current one and
 		 * the current one has not been updated yet.
 		 */
-		vm_write_begin(vma);
-		WRITE_ONCE(vma->vm_flags, new_flags);
+		vma->vm_flags = new_flags;
 		vma->vm_userfaultfd_ctx.ctx = ctx;
-		vm_write_end(vma);
 
 		if (is_vm_hugetlb_page(vma) && uffd_disable_huge_pmd_share(vma))
 			hugetlb_unshare_all_pmds(vma);
@@ -1675,10 +1668,8 @@ static int userfaultfd_unregister(struct userfaultfd_ctx *ctx,
 		 * the next vma was merged into the current one and
 		 * the current one has not been updated yet.
 		 */
-		vm_write_begin(vma);
-		WRITE_ONCE(vma->vm_flags, new_flags);
+		vma->vm_flags = new_flags;
 		vma->vm_userfaultfd_ctx = NULL_VM_UFFD_CTX;
-		vm_write_end(vma);
 
 	skip:
 		prev = vma;
@@ -1759,7 +1750,9 @@ static int userfaultfd_copy(struct userfaultfd_ctx *ctx,
 	ret = -EINVAL;
 	if (uffdio_copy.src + uffdio_copy.len <= uffdio_copy.src)
 		goto out;
-	if (uffdio_copy.mode & ~(UFFDIO_COPY_MODE_DONTWAKE|UFFDIO_COPY_MODE_WP))
+	if (uffdio_copy.mode & ~(UFFDIO_COPY_MODE_DONTWAKE|
+				 UFFDIO_COPY_MODE_WP|
+				 UFFDIO_COPY_MODE_MMAP_TRYLOCK))
 		goto out;
 	if (mmget_not_zero(ctx->mm)) {
 		ret = mcopy_atomic(ctx->mm, uffdio_copy.dst, uffdio_copy.src,
@@ -1810,13 +1803,14 @@ static int userfaultfd_zeropage(struct userfaultfd_ctx *ctx,
 	if (ret)
 		goto out;
 	ret = -EINVAL;
-	if (uffdio_zeropage.mode & ~UFFDIO_ZEROPAGE_MODE_DONTWAKE)
+	if (uffdio_zeropage.mode & ~(UFFDIO_ZEROPAGE_MODE_DONTWAKE|
+				     UFFDIO_ZEROPAGE_MODE_MMAP_TRYLOCK))
 		goto out;
 
 	if (mmget_not_zero(ctx->mm)) {
 		ret = mfill_zeropage(ctx->mm, uffdio_zeropage.range.start,
 				     uffdio_zeropage.range.len,
-				     &ctx->mmap_changing);
+				     &ctx->mmap_changing, uffdio_zeropage.mode);
 		mmput(ctx->mm);
 	} else {
 		return -ESRCH;

@@ -705,24 +705,6 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 
 	dev_set_name(&host->class_dev, "mmc%d", host->index);
 
-#ifdef VENDOR_EDIT
-//yh@bsp, 2015-10-21 Add for special card compatible
-        host->card_stuck_in_programing_status = false;
-#endif /* VENDOR_EDIT */
-#ifdef VENDOR_EDIT
-//Gavin.Lei@BSP.Storage.SDCard 2020-7-20 Add for abnormal SD card compatible
-	host->card_multiread_timeout_err_cnt = 0;
-	host->old_blk_rq_rd_pos = 0;
-	host->card_first_rd_timeout = false;
-	host->card_rd_timeout_start = 0;
-	host->card_is_rd_abnormal = false;
-	host->card_multiwrite_timeout_err_cnt = 0;
-	host->old_blk_rq_wr_pos = 0;
-	host->card_first_wr_timeout = false;
-	host->card_wr_timeout_start = 0;
-	host->card_is_wr_abnormal = false;
-#endif /* VENDOR_EDIT */
-
 	host->parent = dev;
 	host->class_dev.parent = dev;
 	host->class_dev.class = &mmc_host_class;
@@ -748,10 +730,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
 	setup_timer(&host->retune_timer, mmc_retune_timer, (unsigned long)host);
 
 	mutex_init(&host->rpmb_req_mutex);
-#ifdef VENDOR_EDIT
-    //Lycan.Wang@Prd.BasicDrv, 2014-07-09 Add for retry 5 times when new sdcard init error
-    host->detect_change_retry = 5;
-#endif /* VENDOR_EDIT */
+
 	/*
 	 * By default, hosts do not support SGIO or large requests.
 	 * They have to set these according to their abilities.
@@ -1091,7 +1070,7 @@ EXPORT_SYMBOL(mmc_remove_host);
  */
 void mmc_free_host(struct mmc_host *host)
 {
-        cancel_delayed_work_sync(&host->detect);
+	cancel_delayed_work_sync(&host->detect);
 	mmc_crypto_free_host(host);
 	mmc_pwrseq_free(host);
 	put_device(&host->class_dev);

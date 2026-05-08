@@ -727,8 +727,23 @@ static int dwc3_gadget_set_ep_config(struct dwc3 *dwc, struct dwc3_ep *dep,
 		params.param0 |= DWC3_DEPCFG_FIFO_NUMBER(dep->number >> 1);
 
 	if (desc->bInterval) {
-		params.param1 |= DWC3_DEPCFG_BINTERVAL_M1(desc->bInterval - 1);
-		dep->interval = 1 << (desc->bInterval - 1);
+		u8 bInterval_m1;
+
+		/*
+		 * Valid range for DEPCFG.bInterval_m1 is from 0 to 13, and it
+		 * must be set to 0 when the controller operates in full-speed.
+		 */
+		bInterval_m1 = min_t(u8, desc->bInterval - 1, 13);
+		if (dwc->gadget.speed == USB_SPEED_FULL)
+			bInterval_m1 = 0;
+
+		if (usb_endpoint_type(desc) == USB_ENDPOINT_XFER_INT &&
+		    dwc->gadget.speed == USB_SPEED_FULL)
+			dep->interval = desc->bInterval;
+		else
+			dep->interval = 1 << (desc->bInterval - 1);
+
+		params.param1 |= DWC3_DEPCFG_BINTERVAL_M1(bInterval_m1);
 	}
 
 	return dwc3_send_gadget_ep_cmd(dep, DWC3_DEPCMD_SETEPCONFIG, &params);
@@ -855,10 +870,6 @@ out:
 
 static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 {
-#ifdef VENDOR_EDIT
-/*Gang.Yan@BSP.CHG.BASIC,06/04/2020,CR 2645944 to solve the dump*/
-	int retries = 40;
-#endif
 	struct dwc3_request		*req;
 	int ret;
 
@@ -880,15 +891,7 @@ static void dwc3_remove_requests(struct dwc3 *dwc, struct dwc3_ep *dep)
 		dwc->eps[0]->trb_enqueue = 0;
 		dwc->eps[1]->trb_enqueue = 0;
 	}
-#ifdef VENDOR_EDIT
-/*Gang.Yan@BSP.CHG.BASIC,06/04/2020,CR 2645944 to solve the dump*/
-	do {
-		udelay(50);
-	} while ((dep->flags & DWC3_EP_END_TRANSFER_PENDING) && --retries);
-	if (!retries)
-		dbg_log_string("ep end_xfer cmd completion timeout for %d",
-		dep->number);
-#endif
+
 	/* - giveback all requests to gadget driver */
 	while (!list_empty(&dep->started_list)) {
 		req = next_request(&dep->started_list);
@@ -1990,6 +1993,7 @@ static int dwc3_gadget_wakeup_int(struct dwc3 *dwc)
 	case DWC3_LINK_STATE_RESET:
 	case DWC3_LINK_STATE_RX_DET:	/* in HS, means Early Suspend */
 	case DWC3_LINK_STATE_U3:	/* in HS, means SUSPEND */
+	case DWC3_LINK_STATE_U2:	/* in HS, means Sleep (L1) */
 	case DWC3_LINK_STATE_RESUME:
 		break;
 	case DWC3_LINK_STATE_U1:
@@ -2378,6 +2382,10 @@ static void dwc3_gadget_enable_irq(struct dwc3 *dwc)
 
 	if (dwc->revision < DWC3_REVISION_230A)
 		reg |= DWC3_DEVTEN_ULSTCNGEN;
+
+	/* On 2.30a and above this bit enables U3/L2-L1 Suspend Events */
+	if (dwc->revision >= DWC3_REVISION_230A)
+		reg |= DWC3_DEVTEN_EOPFEN;
 
 	dwc3_writel(dwc->regs, DWC3_DEVTEN, reg);
 }
@@ -3337,6 +3345,15 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	usb_phy_start_link_training(dwc->usb3_phy);
 
 	/*
+	 * Ideally, dwc3_reset_gadget() would trigger the function
+	 * drivers to stop any active transfers through ep disable.
+	 * However, for functions which defer ep disable, such as mass
+	 * storage, we will need to rely on the call to stop active
+	 * transfers here, and avoid allowing of request queuing.
+	 */
+	dwc->connected = false;
+
+	/*
 	 * WORKAROUND: DWC3 revisions <1.88a have an issue which
 	 * would cause a missing Disconnect Event if there's a
 	 * pending Setup Packet in the FIFO.
@@ -3949,11 +3966,6 @@ static irqreturn_t dwc3_check_event_buf(struct dwc3_event_buffer *evt)
 
 	/* controller reset is still pending */
 	if (dwc->err_evt_seen)
-		/*
-		 * Trigger runtime resume. The get() function will be balanced
-		 * after processing the pending events in dwc3_process_pending
-		 * events().
-		 */
 		return IRQ_HANDLED;
 
 	/*

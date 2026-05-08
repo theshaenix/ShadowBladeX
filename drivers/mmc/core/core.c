@@ -2988,7 +2988,7 @@ int mmc_set_uhs_voltage(struct mmc_host *host, u32 ocr)
 	mmc_host_clk_hold(host);
 	err = mmc_wait_for_cmd(host, &cmd, 0);
 	if (err)
-		goto err_command;
+		goto power_cycle;
 
 	if (!mmc_host_is_spi(host) && (cmd.resp[0] & R1_ERROR)) {
 		err = -EIO;
@@ -4437,12 +4437,7 @@ void mmc_stop_host(struct mmc_host *host)
 	}
 
 	host->rescan_disable = 1;
-#ifndef VENDOR_EDIT 
-//tianwen@BSP.Kernel.Stability, 2019/11/01, Modify for system_server hang
 	cancel_delayed_work_sync(&host->detect);
-#else
-	cancel_delayed_work(&host->detect);
-#endif
 
 	/* clear pm flags now and let card drivers set them as needed */
 	host->pm_flags = 0;

@@ -20,6 +20,15 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
+/*
+ * Blindly accessing user memory from NMI context can be dangerous
+ * if we're in the middle of switching the current user task or switching
+ * the loaded mm.
+ */
+#ifndef nmi_uaccess_okay
+# define nmi_uaccess_okay() true
+#endif
+
 #ifdef CONFIG_MMU
 
 #ifdef CONFIG_HAVE_RCU_TABLE_FREE
@@ -145,7 +154,8 @@ void tlb_flush_mmu(struct mmu_gather *tlb);
 void arch_tlb_finish_mmu(struct mmu_gather *tlb,
 			 unsigned long start, unsigned long end, bool force);
 void tlb_flush_pmd_range(struct mmu_gather *tlb, unsigned long address,
-			 unsigned long size);
+                         unsigned long size);
+void tlb_flush_mmu_free(struct mmu_gather *tlb);
 extern bool __tlb_remove_page_size(struct mmu_gather *tlb, struct page *page,
 				   int page_size);
 

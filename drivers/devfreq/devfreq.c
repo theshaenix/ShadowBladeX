@@ -263,15 +263,10 @@ int update_devfreq(struct devfreq *devfreq)
 	if (!devfreq->governor)
 		return -EINVAL;
 
-	if (devfreq->max_boost) {
-		/* Use the max freq for max boosts */
-		freq = ULONG_MAX;
-	} else {
-		/* Reevaluate the proper frequency */
-		err = devfreq->governor->get_target_freq(devfreq, &freq);
-		if (err)
-			return err;
-	}
+	/* Reevaluate the proper frequency */
+	err = devfreq->governor->get_target_freq(devfreq, &freq);
+	if (err)
+		return err;
 
 	/*
 	 * Adjust the frequency with user freq and QoS.
@@ -524,7 +519,7 @@ static void devfreq_dev_release(struct device *dev)
 
 	mutex_destroy(&devfreq->lock);
 	mutex_destroy(&devfreq->event_lock);
-        srcu_cleanup_notifier_head(&devfreq->transition_notifier_list);
+	srcu_cleanup_notifier_head(&devfreq->transition_notifier_list);
 	kfree(devfreq);
 }
 
@@ -1136,10 +1131,6 @@ static ssize_t min_freq_store(struct device *dev, struct device_attribute *attr,
 	int ret;
 	unsigned long max;
 
-	/* Minfreq is managed by devfreq_boost */
-	if (df->is_boost_device)
-		return count;
-
 	ret = sscanf(buf, "%lu", &value);
 	if (ret != 1)
 		return -EINVAL;
@@ -1312,8 +1303,7 @@ static int __init devfreq_init(void)
 		return PTR_ERR(devfreq_class);
 	}
 
-	devfreq_wq = alloc_workqueue("devfreq_wq", WQ_HIGHPRI | WQ_FREEZABLE |
-				     WQ_UNBOUND | WQ_MEM_RECLAIM, 1);
+	devfreq_wq = create_freezable_workqueue("devfreq_wq");
 	if (!devfreq_wq) {
 		class_destroy(devfreq_class);
 		pr_err("%s: couldn't create workqueue\n", __FILE__);

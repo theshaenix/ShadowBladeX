@@ -64,26 +64,17 @@
  * generates .data.identifier sections, which need to be pulled in with
  * .data. We don't want to pull in .data..other sections, which Linux
  * has defined. Same for text and bss.
- *
- * RODATA_MAIN is not used because existing code already defines .rodata.x
- * sections to be brought in with rodata.
  */
 #if defined(CONFIG_LD_DEAD_CODE_DATA_ELIMINATION) || defined(CONFIG_LTO_CLANG)
 #define TEXT_MAIN .text .text.[0-9a-zA-Z_]*
-#define TEXT_CFI_MAIN .text.cfi .text.[0-9a-zA-Z_]*.cfi
-#define DATA_MAIN .data .data.[0-9a-zA-Z_]*
-#define SDATA_MAIN .sdata .sdata.[0-9a-zA-Z_]*
-#define RODATA_MAIN .rodata .rodata.[0-9a-zA-Z_]*
-#define BSS_MAIN .bss .bss.[0-9a-zA-Z_]*
-#define SBSS_MAIN .sbss .sbss.[0-9a-zA-Z_]*
+#define TEXT_CFI_MAIN .text.[0-9a-zA-Z_]*.cfi
+#define DATA_MAIN .data .data.[0-9a-zA-Z_]* .data..compoundliteral* .data..L*
+#define BSS_MAIN .bss .bss.[0-9a-zA-Z_]* .bss..compoundliteral* .bss..L*
 #else
 #define TEXT_MAIN .text
 #define TEXT_CFI_MAIN .text.cfi
 #define DATA_MAIN .data
-#define SDATA_MAIN .sdata
-#define RODATA_MAIN .rodata
 #define BSS_MAIN .bss
-#define SBSS_MAIN .sbss
 #endif
 
 /*
@@ -124,7 +115,7 @@
 
 #ifdef CONFIG_TRACE_BRANCH_PROFILING
 #define LIKELY_PROFILE()	VMLINUX_SYMBOL(__start_annotated_branch_profile) = .; \
-				KEEP(*(_ftrace_annotated_branch))		      \
+				*(_ftrace_annotated_branch)			      \
 				VMLINUX_SYMBOL(__stop_annotated_branch_profile) = .;
 #else
 #define LIKELY_PROFILE()
@@ -132,7 +123,7 @@
 
 #ifdef CONFIG_PROFILE_ALL_BRANCHES
 #define BRANCH_PROFILE()	VMLINUX_SYMBOL(__start_branch_profile) = .;   \
-				KEEP(*(_ftrace_branch))			      \
+				*(_ftrace_branch)			      \
 				VMLINUX_SYMBOL(__stop_branch_profile) = .;
 #else
 #define BRANCH_PROFILE()
@@ -148,7 +139,7 @@
 #endif
 
 #ifdef CONFIG_FUNCTION_ERROR_INJECTION
-#define ERROR_INJECT_WHITELIST()	. = ALIGN(8);			      \
+#define ERROR_INJECT_WHITELIST()	STRUCT_ALIGN();			      \
 			VMLINUX_SYMBOL(__start_error_injection_whitelist) = .;\
 			KEEP(*(_error_injection_whitelist))		      \
 			VMLINUX_SYMBOL(__stop_error_injection_whitelist) = .;
@@ -207,6 +198,15 @@
 #define EARLYCON_TABLE()
 #endif
 
+#ifdef CONFIG_SECURITY
+#define LSM_TABLE()	. = ALIGN(8);					\
+			VMLINUX_SYMBOL(__start_lsm_info) = .;				\
+			KEEP(*(.lsm_info.init))				\
+			VMLINUX_SYMBOL(__end_lsm_info) = .;
+#else
+#define LSM_TABLE()
+#endif
+
 #define ___OF_TABLE(cfg, name)	_OF_TABLE_##cfg(name)
 #define __OF_TABLE(cfg, name)	___OF_TABLE(cfg, name)
 #define OF_TABLE(cfg, name)	__OF_TABLE(IS_ENABLED(cfg), name)
@@ -249,8 +249,8 @@
 	*(DATA_MAIN)							\
 	*(.ref.data)							\
 	*(.data..shared_aligned) /* percpu related */			\
-	MEM_KEEP(init.data*)						\
-	MEM_KEEP(exit.data*)						\
+	MEM_KEEP(init.data)						\
+	MEM_KEEP(exit.data)						\
 	*(.data.unlikely)						\
 	STRUCT_ALIGN();							\
 	*(__tracepoints)						\
@@ -296,7 +296,11 @@
 #define INIT_TASK_DATA(align)						\
 	. = ALIGN(align);						\
 	VMLINUX_SYMBOL(__start_init_task) = .;				\
+	VMLINUX_SYMBOL(init_thread_union) = .;				\
+	VMLINUX_SYMBOL(init_stack) = .;					\
 	*(.data..init_task)						\
+	*(.data..init_thread_info)					\
+	. = VMLINUX_SYMBOL(__start_init_task) + THREAD_SIZE;		\
 	VMLINUX_SYMBOL(__end_init_task) = .;
 
 /*
@@ -474,13 +478,6 @@
 #define RODATA          RO_DATA_SECTION(4096)
 #define RO_DATA(align)  RO_DATA_SECTION(align)
 
-#define SECURITY_INIT							\
-	.security_initcall.init : AT(ADDR(.security_initcall.init) - LOAD_OFFSET) { \
-		VMLINUX_SYMBOL(__security_initcall_start) = .;		\
-		KEEP(*(.security_initcall.init))			\
-		VMLINUX_SYMBOL(__security_initcall_end) = .;		\
-	}
-
 /*
  * .text section. Map to function alignment to avoid address changes
  * during second ld run in second ld pass when generating System.map
@@ -495,9 +492,9 @@
 		*(TEXT_MAIN .text.fixup)				\
 		*(.text.unlikely .text.unlikely.*)			\
 		*(.text.unknown .text.unknown.*)			\
+		*(TEXT_CFI_MAIN) 					\
 		*(.text..refcount)					\
 		*(.text..ftrace)					\
-		*(TEXT_CFI_MAIN) 					\
 		*(.ref.text)						\
 		*(.text.asan.* .text.tsan.*)				\
 	MEM_KEEP(init.text)						\
@@ -578,6 +575,10 @@
 		__start_BTF = .;					\
 		*(.BTF)							\
 		__stop_BTF = .;						\
+	}								\
+	. = ALIGN(4);							\
+	.BTF_ids : AT(ADDR(.BTF_ids) - LOAD_OFFSET) {			\
+		*(.BTF_ids)						\
 	}
 #else
 #define BTF
@@ -606,8 +607,8 @@
 /* init and exit section handling */
 #define INIT_DATA							\
 	KEEP(*(SORT(___kentry+*)))					\
-	*(.init.data init.data.*)					\
-	MEM_DISCARD(init.data*)						\
+	*(.init.data)							\
+	MEM_DISCARD(init.data)						\
 	KERNEL_CTORS()							\
 	MCOUNT_REC()							\
 	*(.init.rodata .init.rodata.*)					\
@@ -627,19 +628,20 @@
 	ACPI_PROBE_TABLE(irqchip)					\
 	ACPI_PROBE_TABLE(timer)						\
 	ACPI_PROBE_TABLE(iort)						\
-	EARLYCON_TABLE()
+	EARLYCON_TABLE()						\
+	LSM_TABLE()
 
 #define INIT_TEXT							\
 	*(.init.text .init.text.*)					\
 	*(.text.startup)						\
-	MEM_DISCARD(init.text*)
+	MEM_DISCARD(init.text)
 
 #define EXIT_DATA							\
-	*(.exit.data .exit.data.*)					\
+	*(.exit.data)							\
 	*(.fini_array)							\
 	*(.dtors)							\
-	MEM_DISCARD(exit.data*)						\
-	MEM_DISCARD(exit.rodata*)
+	MEM_DISCARD(exit.data)						\
+	MEM_DISCARD(exit.rodata)
 
 #define EXIT_TEXT							\
 	*(.exit.text)							\
@@ -657,7 +659,7 @@
 	. = ALIGN(sbss_align);						\
 	.sbss : AT(ADDR(.sbss) - LOAD_OFFSET) {				\
 		*(.dynsbss)						\
-		*(SBSS_MAIN)						\
+		*(.sbss)						\
 		*(.scommon)						\
 	}
 
@@ -789,7 +791,7 @@
 #define NOTES								\
 	.notes : AT(ADDR(.notes) - LOAD_OFFSET) {			\
 		VMLINUX_SYMBOL(__start_notes) = .;			\
-		KEEP(*(.note.*))					\
+		*(.note.*)						\
 		VMLINUX_SYMBOL(__stop_notes) = .;			\
 	}
 
@@ -822,11 +824,6 @@
 		VMLINUX_SYMBOL(__con_initcall_start) = .;		\
 		KEEP(*(.con_initcall.init))				\
 		VMLINUX_SYMBOL(__con_initcall_end) = .;
-
-#define SECURITY_INITCALL						\
-		VMLINUX_SYMBOL(__security_initcall_start) = .;		\
-		KEEP(*(.security_initcall.init))			\
-		VMLINUX_SYMBOL(__security_initcall_end) = .;
 
 #ifdef CONFIG_BLK_DEV_INITRD
 #define INIT_RAM_FS							\
@@ -976,7 +973,6 @@
 		INIT_SETUP(initsetup_align)				\
 		INIT_CALLS						\
 		CON_INITCALL						\
-		SECURITY_INITCALL					\
 		INIT_RAM_FS						\
 	}
 

@@ -37,6 +37,7 @@
 #define S16_MAX		((s16)(U16_MAX>>1))
 #define S16_MIN		((s16)(-S16_MAX - 1))
 #define U32_MAX		((u32)~0U)
+#define U32_MIN		((u32)0)
 #define S32_MAX		((s32)(U32_MAX>>1))
 #define S32_MIN		((s32)(-S32_MAX - 1))
 #define U64_MAX		((u64)~0ULL)
@@ -675,6 +676,9 @@ do {									\
  * let gcc optimize the rest.
  */
 
+#ifdef CONFIG_DISABLE_TRACE_PRINTK
+#define trace_printk pr_debug
+#else
 #define trace_printk(fmt, ...)				\
 do {							\
 	char _______STR[] = __stringify((__VA_ARGS__));	\
@@ -697,6 +701,7 @@ do {									\
 	else								\
 		__trace_printk(_THIS_IP_, fmt, ##args);			\
 } while (0)
+#endif
 
 extern __printf(2, 3)
 int __trace_bprintk(unsigned long ip, const char *fmt, ...);

@@ -302,12 +302,11 @@ static void thermal_zone_device_set_polling(struct workqueue_struct *queue,
 					    int delay)
 {
 	if (delay > 1000)
-		mod_delayed_work(system_freezable_power_efficient_wq,
-				 &tz->poll_queue,
+		mod_delayed_work(queue, &tz->poll_queue,
 				 round_jiffies(msecs_to_jiffies(delay)));
 	else if (delay)
-		mod_delayed_work(system_freezable_power_efficient_wq,
-				 &tz->poll_queue, msecs_to_jiffies(delay));
+		mod_delayed_work(queue, &tz->poll_queue,
+				 msecs_to_jiffies(delay));
 	else
 		cancel_delayed_work(&tz->poll_queue);
 }
@@ -797,7 +796,7 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
 	if (result)
 		goto release_ida;
 
-        snprintf(dev->attr_name, sizeof(dev->attr_name), "cdev%d_trip_point",
+	snprintf(dev->attr_name, sizeof(dev->attr_name), "cdev%d_trip_point",
 		 dev->id);
 	sysfs_attr_init(&dev->attr.attr);
 	dev->attr.attr.name = dev->attr_name;
@@ -829,7 +828,7 @@ int thermal_zone_bind_cooling_device(struct thermal_zone_device *tz,
 	if (result)
 		goto remove_upper_file;
 
-        snprintf(dev->weight_attr_name, sizeof(dev->weight_attr_name),
+	snprintf(dev->weight_attr_name, sizeof(dev->weight_attr_name),
 		 "cdev%d_weight", dev->id);
 	sysfs_attr_init(&dev->weight_attr.attr);
 	dev->weight_attr.attr.name = dev->weight_attr_name;

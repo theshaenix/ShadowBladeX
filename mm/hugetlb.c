@@ -2974,7 +2974,7 @@ static int proc_hugetlb_doulongvec_minmax(struct ctl_table *table, int write,
 
 static int hugetlb_sysctl_handler_common(bool obey_mempolicy,
 			 struct ctl_table *table, int write,
-			 void __user *buffer, size_t *length, loff_t *ppos)
+			 void *buffer, size_t *length, loff_t *ppos)
 {
 	struct hstate *h = &default_hstate;
 	unsigned long tmp = h->max_huge_pages;
@@ -2996,7 +2996,7 @@ out:
 }
 
 int hugetlb_sysctl_handler(struct ctl_table *table, int write,
-			  void __user *buffer, size_t *length, loff_t *ppos)
+			  void *buffer, size_t *length, loff_t *ppos)
 {
 
 	return hugetlb_sysctl_handler_common(false, table, write,
@@ -3005,7 +3005,7 @@ int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 
 #ifdef CONFIG_NUMA
 int hugetlb_mempolicy_sysctl_handler(struct ctl_table *table, int write,
-			  void __user *buffer, size_t *length, loff_t *ppos)
+			  void *buffer, size_t *length, loff_t *ppos)
 {
 	return hugetlb_sysctl_handler_common(true, table, write,
 							buffer, length, ppos);
@@ -3013,8 +3013,7 @@ int hugetlb_mempolicy_sysctl_handler(struct ctl_table *table, int write,
 #endif /* CONFIG_NUMA */
 
 int hugetlb_overcommit_handler(struct ctl_table *table, int write,
-			void __user *buffer,
-			size_t *length, loff_t *ppos)
+		void *buffer, size_t *length, loff_t *ppos)
 {
 	struct hstate *h = &default_hstate;
 	unsigned long tmp;
@@ -3209,7 +3208,7 @@ static int hugetlb_vm_op_split(struct vm_area_struct *vma, unsigned long addr)
  * hugegpage VMA.  do_page_fault() is supposed to trap this, so BUG is we get
  * this far.
  */
-static int hugetlb_vm_op_fault(struct vm_fault *vmf)
+static vm_fault_t hugetlb_vm_op_fault(struct vm_fault *vmf)
 {
 	BUG();
 	return 0;
@@ -4156,8 +4155,17 @@ int hugetlb_mcopy_atomic_pte(struct mm_struct *dst_mm,
 	spinlock_t *ptl;
 	int ret;
 	struct page *page;
+	int writable;
 
-	if (!*pagep) {
+	mapping = dst_vma->vm_file->f_mapping;
+	idx = vma_hugecache_offset(h, dst_vma, dst_addr);
+
+	if (is_continue) {
+		ret = -EFAULT;
+		page = find_lock_page(mapping, idx);
+		if (!page)
+			goto out;
+	} else if (!*pagep) {
 		/* If a page already exists, then it's UFFDIO_COPY for
 		 * a non-missing case. Return -EEXIST.
 		 */

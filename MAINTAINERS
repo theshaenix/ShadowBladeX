@@ -2707,6 +2707,11 @@ F:	include/uapi/linux/if_bonding.h
 BPF (Safe dynamic programs and tools)
 M:	Alexei Starovoitov <ast@kernel.org>
 M:	Daniel Borkmann <daniel@iogearbox.net>
+R:	Martin KaFai Lau <kafai@fb.com>
+R:	Song Liu <songliubraving@fb.com>
+R:	Yonghong Song <yhs@fb.com>
+R:	Andrii Nakryiko <andriin@fb.com>
+R:	KP Singh <kpsingh@chromium.org>
 L:	netdev@vger.kernel.org
 L:	linux-kernel@vger.kernel.org
 S:	Supported
@@ -5133,6 +5138,16 @@ S:	Maintained
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kristoffer/linux-hpc.git
 F:	drivers/video/fbdev/s1d13xxxfb.c
 F:	include/video/s1d13xxxfb.h
+
+EROFS FILE SYSTEM
+M:	Gao Xiang <xiang@kernel.org>
+M:	Chao Yu <yuchao0@huawei.com>
+L:	linux-erofs@lists.ozlabs.org
+S:	Maintained
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/xiang/erofs.git
+F:	Documentation/filesystems/erofs.txt
+F:	fs/erofs/
+F:	include/trace/events/erofs.h
 
 ERRSEQ ERROR TRACKING INFRASTRUCTURE
 M:	Jeff Layton <jlayton@poochiereds.net>
@@ -12132,6 +12147,7 @@ F:	include/linux/selinux*
 F:	security/selinux/
 F:	scripts/selinux/
 F:	Documentation/admin-guide/LSM/SELinux.rst
+F:	Documentation/ABI/obsolete/sysfs-selinux-disable
 
 SENSABLE PHANTOM
 M:	Jiri Slaby <jirislaby@gmail.com>
@@ -14604,6 +14620,14 @@ M:	William Breathitt Gray <vilhelm.gray@gmail.com>
 L:	linux-gpio@vger.kernel.org
 S:	Maintained
 F:	drivers/gpio/gpio-ws16c48.c
+
+WIREGUARD SECURE NETWORK TUNNEL
+M:	Jason A. Donenfeld <Jason@zx2c4.com>
+S:	Maintained
+F:	drivers/net/wireguard/
+F:	tools/testing/selftests/wireguard/
+L:	wireguard@lists.zx2c4.com
+L:	netdev@vger.kernel.org
 
 WISTRON LAPTOP BUTTON DRIVER
 M:	Miloslav Trmac <mitr@volny.cz>
