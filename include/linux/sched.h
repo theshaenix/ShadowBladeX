@@ -898,7 +898,7 @@ struct task_struct {
 
 	struct mm_struct		*mm;
 	struct mm_struct		*active_mm;
-	/* task is frozen/stopped (used by the cgroup freezer) */
+	/* task is frozen (used by the cgroup freezer) */
 	unsigned			frozen:1;
 
 	/* Per-thread vma caching: */
