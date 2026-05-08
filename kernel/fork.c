@@ -1586,10 +1586,14 @@ init_task_pid(struct task_struct *task, enum pid_type type, struct pid *pid)
 {
 	if (type == PIDTYPE_PID)
 		task->thread_pid = pid;
-	else if (likely(task->signal))
-		task->signal->pids[type] = pid;
+	else if (type < PIDTYPE_MAX) {
+		if (likely(task->signal))
+			task->signal->pids[type] = pid;
+		else
+			WARN_ONCE(1, "init_task_pid: NULL signal for type %d\n", type);
+	}
 	else
-		WARN_ON_ONCE(1);
+		WARN_ONCE(1, "init_task_pid: invalid type %d\n", type);
 }
 
 static int pidfd_release(struct inode *inode, struct file *file)
