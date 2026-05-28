@@ -6,6 +6,15 @@ config OPLUS_SYSTEM_KERNEL
   help
 	define this config to add oplus sytstem kernel feature
 
+config OPLUS_SYSTEM_KERNEL_QCOM
+  bool "config oplus system feature for QCOM platform"
+  depends on OPLUS_SYSTEM_KERNEL && ARCH_QCOM
+  default y
+  help
+	select the QCOM variant of the oplus system drivers (oplus_project,
+	project_info). Upstream OPLUS injects this from the Android vendor
+	build; defined here so standalone kernel builds resolve it natively.
+
 config OPLUS_FEATURE_DETAILHEAD
   tristate "config detail kmsg"
     help
