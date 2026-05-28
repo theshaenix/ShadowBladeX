@@ -15,6 +15,23 @@ config OPLUS_SYSTEM_KERNEL_QCOM
 	project_info). Upstream OPLUS injects this from the Android vendor
 	build; defined here so standalone kernel builds resolve it natively.
 
+config OPLUS_SECURE_GUARD
+  bool "config oplus secure guard / kevent upload infrastructure"
+  depends on OPLUS_SYSTEM_KERNEL
+  default y
+  help
+	enable the OPLUS kevent netlink bus (kernel/keventupload). Many
+	oplus drivers report events to userspace through it. Upstream OPLUS
+	injects this from the Android vendor build; defined natively here.
+
+config OPLUS_KEVENT_UPLOAD
+  bool "config oplus kevent upload to userspace"
+  depends on OPLUS_SECURE_GUARD
+  default y
+  help
+	provides struct kernel_packet_info and kevent_send_to_user() used by
+	oplus feedback drivers (oppo_kevent_feedback, mm_fb, etc.).
+
 config OPLUS_FEATURE_DETAILHEAD
   tristate "config detail kmsg"
     help
