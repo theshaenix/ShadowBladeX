@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0
 ccflags-y := -Iinclude/drm -Idrivers/gpu/drm/msm -Idrivers/gpu/drm/msm/dsi-staging -Idrivers/gpu/drm/msm/dp
 ccflags-y += -Idrivers/gpu/drm/msm/display-manager
+# OPLUS display feature macros (mythos's Android build injects these globally;
+# define them for the ported OPLUS display stack to compile/function)
+ccflags-y += -DVENDOR_EDIT -DOPLUS_BUG_STABILITY -DOPLUS_BUG_DEBUG -DOPLUS_FEATURE_AOD_RAMLESS -DOPLUS_FEATURE_LCD_CABC
 ccflags-$(CONFIG_DRM_MSM_DSI) += -Idrivers/gpu/drm/msm/dsi
 ccflags-y += -Idrivers/gpu/drm/msm/oplus
 ccflags-$(CONFIG_DRM_MSM_DSI_PLL) += -Idrivers/gpu/drm/msm/dsi
