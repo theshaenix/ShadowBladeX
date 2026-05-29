@@ -17389,10 +17389,15 @@ static void register_oplus_pdsvooc_svid(struct work_struct *work) {
 	}
 	pr_err(" pd NULL");
 	if (IS_ERR(pd)) {
-		chg_err("oplus pps usbpd phandle failed (%ld)\n", PTR_ERR(pd));
+		static int pps_retry;
 		rc = PTR_ERR(pd);
 		chg->oplus_pd = NULL;
-		schedule_delayed_work(&chg->regist_pd, msecs_to_jiffies(1000));
+		if (++pps_retry < 10) {
+			schedule_delayed_work(&chg->regist_pd, msecs_to_jiffies(1000));
+		} else {
+			chg_err("oplus pps usbpd phandle failed (%ld), giving up after %d tries\n",
+				PTR_ERR(pd), pps_retry);
+		}
 	} else {
 		chg_err("oplus pps usbpd phandle failed (%ld)\n", PTR_ERR(pd));
 		chg->oplus_pd = pd;
