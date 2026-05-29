@@ -417,9 +417,17 @@ static int notrace ramoops_pstore_write(struct pstore_record *record)
 	/*
 	 * Out of the various dmesg dump types, ramoops is currently designed
 	 * to only store crash logs, rather than storing general kernel logs.
+	 *
+	 * DEBUG (lineage-base bringup): also capture RESTART/EMERG/HALT/POWEROFF
+	 * so a failing boot that reboots (init/Phoenix) leaves a durable
+	 * dmesg-ramoops dump for cross-boot diagnosis. Revert once booting.
 	 */
 	if (record->reason != KMSG_DUMP_OOPS &&
-	    record->reason != KMSG_DUMP_PANIC)
+	    record->reason != KMSG_DUMP_PANIC &&
+	    record->reason != KMSG_DUMP_RESTART &&
+	    record->reason != KMSG_DUMP_EMERG &&
+	    record->reason != KMSG_DUMP_HALT &&
+	    record->reason != KMSG_DUMP_POWEROFF)
 		return -EINVAL;
 
 	/* Skip Oopes when configured to do so. */
