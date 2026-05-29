@@ -641,9 +641,9 @@
 			size = <0 0x8c00000>;
 		};
 
-		cont_splash_memory: cont_splash_region@9c000000 {
+		cont_splash_memory: splash_region_disabled@9c000000 {
 			reg = <0x0 0x9c000000 0x0 0x01700000>;
-			label = "cont_splash_region";
+			label = "splash_region_disabled";
 		};
 
 		dfps_data_memory: dfps_data_region@9d700000 {
