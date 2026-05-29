@@ -3976,6 +3976,12 @@ static int sde_plane_sspp_atomic_update(struct drm_plane *plane,
 		case PLANE_PROP_ALPHA:
 		case PLANE_PROP_INPUT_FENCE:
 		case PLANE_PROP_BLEND_OP:
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin Shukla@PSW.MM.Display.LCD.Feature,2018-11-21
+ * Support custom property
+*/
+		case PLANE_PROP_CUSTOM:
+#endif /* OPLUS_BUG_STABILITY */
 			/* no special action required */
 			break;
 		case PLANE_PROP_FB_TRANSLATION_MODE:
@@ -4381,7 +4387,6 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 	const struct sde_format_extended *format_list;
 	struct sde_kms_info *info;
 	struct sde_plane *psde = to_sde_plane(plane);
-	int zpos_max = 255;
 	int zpos_def = 0;
 	char feature_name[256];
 
@@ -4399,24 +4404,13 @@ static void _sde_plane_install_properties(struct drm_plane *plane,
 
 	psde->catalog = catalog;
 
-	if (sde_is_custom_client()) {
-		if (catalog->mixer_count &&
-				catalog->mixer[0].sblk->maxblendstages) {
-			zpos_max = catalog->mixer[0].sblk->maxblendstages - 1;
-
-			if (catalog->has_base_layer &&
-					(zpos_max > SDE_STAGE_MAX - 1))
-				zpos_max = SDE_STAGE_MAX - 1;
-			else if (zpos_max > SDE_STAGE_MAX - SDE_STAGE_0 - 1)
-				zpos_max = SDE_STAGE_MAX - SDE_STAGE_0 - 1;
-		}
-	} else if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
+	if (!sde_is_custom_client() && plane->type != DRM_PLANE_TYPE_PRIMARY) {
 		/* reserve zpos == 0 for primary planes */
 		zpos_def = drm_plane_index(plane) + 1;
 	}
 
 	msm_property_install_range(&psde->property_info, "zpos",
-		0x0, 0, zpos_max, zpos_def, PLANE_PROP_ZPOS);
+		0x0, 0, INT_MAX, zpos_def, PLANE_PROP_ZPOS);
 
 	msm_property_install_range(&psde->property_info, "alpha",
 		0x0, 0, 255, 255, PLANE_PROP_ALPHA);

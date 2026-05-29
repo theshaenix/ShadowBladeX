@@ -174,6 +174,7 @@ enum sde_stage {
 	SDE_STAGE_8,
 	SDE_STAGE_9,
 	SDE_STAGE_10,
+	SDE_STAGE_11,
 	SDE_STAGE_MAX
 };
 enum sde_dspp {
@@ -545,6 +546,8 @@ struct sde_hw_cp_cfg {
 	void *mixer_info;
 	u32 displayv;
 	u32 displayh;
+	struct sde_hw_dspp *dspp[DSPP_MAX];
+	bool broadcast_disabled;
 };
 
 /**

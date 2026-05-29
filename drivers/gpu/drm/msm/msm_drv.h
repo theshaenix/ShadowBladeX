@@ -121,6 +121,12 @@ enum msm_mdp_plane_property {
 	PLANE_PROP_PREFILL_TIME,
 	PLANE_PROP_SCALER_V1,
 	PLANE_PROP_SCALER_V2,
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin Shukla@PSW.MM.Display.LCD.Feature,2018-11-21
+ * Support custom propertys
+*/
+	PLANE_PROP_CUSTOM,
+#endif /* OPLUS_BUG_STABILITY */
 	PLANE_PROP_ROT_OUT_FB,
 	PLANE_PROP_INVERSE_PMA,
 
@@ -161,6 +167,12 @@ enum msm_mdp_crtc_property {
 	CRTC_PROP_SECURITY_LEVEL,
 	CRTC_PROP_IDLE_TIMEOUT,
 	CRTC_PROP_DEST_SCALER,
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin Shukla@PSW.MM.Display.LCD.Feature,2018-11-21
+ * Support custom propertys
+*/
+	CRTC_PROP_CUSTOM,
+#endif /* OPLUS_BUG_STABILITY */
 	CRTC_PROP_CAPTURE_OUTPUT,
 
 	CRTC_PROP_IDLE_PC_STATE,
@@ -191,7 +203,12 @@ enum msm_mdp_conn_property {
 	CONNECTOR_PROP_ROI_V1,
 	CONNECTOR_PROP_BL_SCALE,
 	CONNECTOR_PROP_AD_BL_SCALE,
-
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin Shukla@PSW.MM.Display.LCD.Feature,2018-011-21
+ * Support custom propertys
+*/
+	CONNECTOR_PROP_CUSTOM,
+#endif /* OPLUS_BUG_STABILITY */
 	/* enum/bitmask properties */
 	CONNECTOR_PROP_TOPOLOGY_NAME,
 	CONNECTOR_PROP_TOPOLOGY_CONTROL,
@@ -356,7 +373,6 @@ struct msm_roi_caps {
  * @range_max_qp:            Max QP allowed.
  * @range_bpg_offset:        Bits per group adjustment.
  * @extra_width:             Extra width required in timing calculations
- * @pps_delay_ms:            Post PPS command delay in milliseconds.
  */
 struct msm_display_dsc_info {
 	u8 version;
@@ -414,7 +430,6 @@ struct msm_display_dsc_info {
 	char *range_bpg_offset;
 
 	u32 extra_width;
-	u32 pps_delay_ms;
 };
 
 /**
@@ -951,7 +966,6 @@ void __init msm_mdp_register(void);
 void __exit msm_mdp_unregister(void);
 
 void msm_idle_set_state(struct drm_encoder *encoder, bool active);
-
 #ifdef CONFIG_DEBUG_FS
 void msm_gem_describe(struct drm_gem_object *obj, struct seq_file *m);
 void msm_gem_describe_objects(struct list_head *list, struct seq_file *m);

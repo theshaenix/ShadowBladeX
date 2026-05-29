@@ -1,7 +1,4 @@
 /*
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
- */
-/*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (C) 2013 Red Hat
  * Author: Rob Clark <robdclark@gmail.com>
@@ -946,7 +943,6 @@ mdss_init_fail:
 	kfree(priv);
 priv_alloc_fail:
 	drm_dev_unref(ddev);
-	platform_set_drvdata(pdev, NULL);
 	return ret;
 }
 
@@ -2290,21 +2286,11 @@ static int msm_pdev_remove(struct platform_device *pdev)
 
 static void msm_pdev_shutdown(struct platform_device *pdev)
 {
-	struct drm_device *ddev = platform_get_drvdata(pdev);
-	struct msm_drm_private *priv = NULL;
+	struct drm_device *drm = platform_get_drvdata(pdev);
+	struct msm_drm_private *priv = drm ? drm->dev_private : NULL;
 
-	if (!ddev) {
-		DRM_ERROR("invalid drm device node\n");
+	if (!priv || !priv->kms)
 		return;
-	}
-
-	priv = ddev->dev_private;
-	if (!priv) {
-		DRM_ERROR("invalid msm drm private node\n");
-		return;
-	}
-
-	msm_lastclose(ddev);
 
 	/* set this after lastclose to allow kickoff from lastclose */
 	priv->shutdown_in_progress = true;
@@ -2327,7 +2313,6 @@ static struct platform_driver msm_platform_driver = {
 		.of_match_table = dt_match,
 		.pm     = &msm_pm_ops,
 		.suppress_bind_attrs = true,
-		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
 	},
 };
 

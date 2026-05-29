@@ -39,6 +39,14 @@
 #include "sde_core_irq.h"
 #include "sde_hw_top.h"
 #include "sde_hw_qdss.h"
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin Shukla@MM.Display.LCD.Stability, 2020/3/31, for
+ * decoupling display driver
+*/
+#include "oppo_display_private_api.h"
+#include "oppo_onscreenfingerprint.h"
+#include "oppo_dc_diming.h"
+#endif /* OPLUS_BUG_STABILITY */
 
 #define SDE_DEBUG_ENC(e, fmt, ...) SDE_DEBUG("enc%d " fmt,\
 		(e) ? (e)->base.base.id : -1, ##__VA_ARGS__)
@@ -229,7 +237,6 @@ enum sde_enc_rc_states {
  * @recovery_events_enabled:	status of hw recovery feature enable by client
  * @elevated_ahb_vote:		increase AHB bus speed for the first frame
  *				after power collapse
- * @pm_qos_cpu_req:		pm_qos request for cpu frequency
  */
 struct sde_encoder_virt {
 	struct drm_encoder base;
@@ -280,6 +287,11 @@ struct sde_encoder_virt {
 	struct kthread_work input_event_work;
 	struct kthread_work esd_trigger_work;
 	struct input_handler *input_handler;
+#ifdef OPLUS_BUG_STABILITY
+	/*Mark.Yao@PSW.MM.Display.LCD.Stable,2019-12-09 fix
+	input_handler register/unregister */
+	bool input_handler_init;
+#endif /* OPLUS_BUG_STABILITY */
 	bool input_handler_registered;
 	struct msm_display_topology topology;
 	bool vblank_enabled;
@@ -292,48 +304,9 @@ struct sde_encoder_virt {
 
 	bool recovery_events_enabled;
 	bool elevated_ahb_vote;
-	struct pm_qos_request pm_qos_cpu_req;
 };
 
 #define to_sde_encoder_virt(x) container_of(x, struct sde_encoder_virt, base)
-
-static void _sde_encoder_pm_qos_add_request(struct drm_encoder *drm_enc,
-	struct sde_kms *sde_kms)
-{
-	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
-	struct pm_qos_request *req;
-	u32 cpu_mask;
-	u32 cpu_dma_latency;
-	int cpu;
-
-	if (!sde_kms->catalog || !sde_kms->catalog->perf.cpu_mask)
-		return;
-
-	cpu_mask = sde_kms->catalog->perf.cpu_mask;
-	cpu_dma_latency = sde_kms->catalog->perf.cpu_dma_latency;
-
-	req = &sde_enc->pm_qos_cpu_req;
-	req->type = PM_QOS_REQ_AFFINE_CORES;
-	cpumask_empty(&req->cpus_affine);
-	for_each_possible_cpu(cpu) {
-		if ((1 << cpu) & cpu_mask)
-			cpumask_set_cpu(cpu, &req->cpus_affine);
-	}
-	pm_qos_add_request(req, PM_QOS_CPU_DMA_LATENCY, cpu_dma_latency);
-
-	SDE_EVT32_VERBOSE(DRMID(drm_enc), cpu_mask, cpu_dma_latency);
-}
-
-static void _sde_encoder_pm_qos_remove_request(struct drm_encoder *drm_enc,
-	struct sde_kms *sde_kms)
-{
-	struct sde_encoder_virt *sde_enc = to_sde_encoder_virt(drm_enc);
-
-	if (!sde_kms->catalog || !sde_kms->catalog->perf.cpu_mask)
-		return;
-
-	pm_qos_remove_request(&sde_enc->pm_qos_cpu_req);
-}
 
 static struct drm_connector_state *_sde_encoder_get_conn_state(
 		struct drm_encoder *drm_enc)
@@ -1924,11 +1897,13 @@ static int _sde_encoder_update_rsc_client(
 	int wait_count = 0;
 	struct drm_crtc *primary_crtc;
 	int pipe = -1;
-	int rc = 0;
+	int rc = 0, lp_mode = -1;
 	int wait_refcount = 0;
 	u32 qsync_mode = 0;
 	struct msm_drm_private *priv;
 	struct sde_kms *sde_kms;
+	struct list_head *connector_list;
+	struct drm_connector *conn = NULL, *conn_iter;
 
 	if (!drm_enc || !drm_enc->dev) {
 		SDE_ERROR("invalid encoder arguments\n");
@@ -1963,6 +1938,8 @@ static int _sde_encoder_update_rsc_client(
 	}
 
 	sde_kms = to_sde_kms(priv->kms);
+	connector_list = &sde_kms->dev->mode_config.connector_list;
+
 	/**
 	 * only primary command mode panel without Qsync can request CMD state.
 	 * all other panels/displays can request for VID state including
@@ -2003,7 +1980,17 @@ static int _sde_encoder_update_rsc_client(
 			(rsc_state == SDE_RSC_VID_STATE))
 		rsc_state = SDE_RSC_CLK_STATE;
 
-	SDE_EVT32(rsc_state, qsync_mode);
+	list_for_each_entry(conn_iter, connector_list, head)
+		if (conn_iter->encoder == drm_enc)
+			conn = conn_iter;
+
+	if (conn && conn->state) {
+		lp_mode = sde_connector_get_property(conn->state, CONNECTOR_PROP_LP);
+		if ((lp_mode == SDE_MODE_DPMS_LP1 || lp_mode == SDE_MODE_DPMS_LP2) && enable)
+			rsc_state = SDE_RSC_CLK_STATE;
+	}
+
+	SDE_EVT32(rsc_state, qsync_mode, lp_mode);
 
 	prefill_lines = config ? mode_info.prefill_lines +
 		config->inline_rotate_prefill : mode_info.prefill_lines;
@@ -2091,6 +2078,11 @@ static int _sde_encoder_update_rsc_client(
 		if (crtc->base.id == wait_vblank_crtc_id) {
 			ret = sde_encoder_wait_for_event(drm_enc,
 					MSM_ENC_VBLANK);
+			if (ret == -EWOULDBLOCK) {
+				SDE_EVT32(DRMID(drm_enc), wait_vblank_crtc_id, crtc->base.id);
+				msleep(PRIMARY_VBLANK_WORST_CASE_MS);
+				ret = 0;
+			}
 		} else if (primary_crtc->state->active &&
 				!drm_atomic_crtc_needs_modeset(
 						primary_crtc->state)) {
@@ -2271,13 +2263,7 @@ static int _sde_encoder_resource_control_helper(struct drm_encoder *drm_enc,
 		/* enable all the irq */
 		_sde_encoder_irq_control(drm_enc, true);
 
-		if (is_cmd_mode)
-			_sde_encoder_pm_qos_add_request(drm_enc, sde_kms);
-
 	} else {
-		if (is_cmd_mode)
-			_sde_encoder_pm_qos_remove_request(drm_enc, sde_kms);
-
 		/* disable all the irq */
 		_sde_encoder_irq_control(drm_enc, false);
 
@@ -3128,6 +3114,11 @@ static int _sde_encoder_input_handler(
 
 	sde_enc->input_handler = input_handler;
 	sde_enc->input_handler_registered = false;
+#ifdef OPLUS_BUG_STABILITY
+	/*Mark.Yao@PSW.MM.Display.LCD.Stable,2019-12-09 fix
+	input_handler register/unregister */
+	sde_enc->input_handler_init = false;
+#endif /* OPLUS_BUG_STABILITY */
 
 	return rc;
 }
@@ -3301,7 +3292,15 @@ static void sde_encoder_virt_enable(struct drm_encoder *drm_enc)
 			SDE_ERROR(
 			"input handler registration failed, rc = %d\n", ret);
 		else
+#ifdef OPLUS_BUG_STABILITY
+/*Sachin@PSW.MM.Display.LCD.Stable,2019-12-09 fix
+input_handler register/unregister */
+           {
 			sde_enc->input_handler_registered = true;
+            sde_enc->input_handler_init = true;
+           }
+#endif /* OPLUS_BUG_STABILITY */
+
 	}
 
 	if (!(msm_is_mode_seamless_vrr(cur_mode)
@@ -3404,8 +3403,18 @@ static void sde_encoder_virt_disable(struct drm_encoder *drm_enc)
 	sde_encoder_wait_for_event(drm_enc, MSM_ENC_TX_COMPLETE);
 
 	if (sde_enc->input_handler && sde_enc->input_handler_registered) {
-		input_unregister_handler(sde_enc->input_handler);
-		sde_enc->input_handler_registered = false;
+	#ifdef OPLUS_BUG_STABILITY
+	/*Sachin@PSW.MM.Display.LCD.Stable,2019-12-09 fix
+	input_handler register/unregister */
+	    if (sde_enc->input_handler_init) {
+			input_unregister_handler(sde_enc->input_handler);
+			sde_enc->input_handler_init = false;
+	    }
+			sde_enc->input_handler_registered = false;
+	#else
+	    input_unregister_handler(sde_enc->input_handler);
+	    sde_enc->input_handler_registered = false;
+	#endif /* OPLUS_BUG_STABILITY */
 	}
 
 	/*
@@ -3935,6 +3944,13 @@ void sde_encoder_helper_trigger_start(struct sde_encoder_phys *phys_enc)
 	}
 }
 
+void qcdbg_trigger_full_dump(void)
+{
+	SDE_EVT32(0xbd, 0x1, 0xbd);
+	SDE_DBG_DUMP("all", "dbg_bus", "vbif_dbg_bus");
+}
+EXPORT_SYMBOL(qcdbg_trigger_full_dump);
+
 void sde_encoder_helper_hw_reset(struct sde_encoder_phys *phys_enc)
 {
 	struct sde_encoder_virt *sde_enc;
@@ -4254,7 +4270,13 @@ void sde_encoder_trigger_kickoff_pending(struct drm_encoder *drm_enc)
 
 static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 {
-	void *dither_cfg = NULL;
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin@PSW.MM.Display.LCD.Feature,2020-06-08
+ * Force enable dither on OnScreenFingerprint scene,add QCOM patch,
+ * fix BUG:49203
+*/
+	void *dither_cfg;
+#endif /* OPLUS_BUG_STABILITY */
 	int ret = 0, rc, i = 0;
 	size_t len = 0;
 	enum sde_rm_topology_name topology;
@@ -4288,11 +4310,15 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 		return;
 	}
 
+#ifdef OPLUS_BUG_STABILITY
+/* Sachin@PSW.MM.Display.LCD.Feature,2020-06-08
+ * Force enable dither on OnScreenFingerprint scene,add QCOM patch,fix BUG:49203
+*/
 	ret = sde_connector_get_dither_cfg(phys->connector,
-			phys->connector->state, &dither_cfg,
-			&len, sde_enc->idle_pc_restore);
+			phys->connector->state, &dither_cfg, &len);
 	if (ret)
 		return;
+#endif /* OPLUS_BUG_STABILITY */
 
 	if (TOPOLOGY_DUALPIPE_MERGE_MODE(topology)) {
 		for (i = 0; i < MAX_CHANNELS_PER_ENC; i++) {
@@ -4303,6 +4329,12 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 			}
 		}
 	} else {
+//#ifdef OPLUS_BUG_STABILITY
+/* Sachin@PSW.MM.Display.LCD.Feature,2018-11-19
+ * Force enable dither on OnScreenFingerprint scene
+*/
+		if (_sde_encoder_setup_dither_for_onscreenfingerprint(phys, dither_cfg, len))
+//#endif /* OPLUS_BUG_STABILITY */
 		phys->hw_pp->ops.setup_dither(phys->hw_pp, dither_cfg, len);
 	}
 }
@@ -4655,7 +4687,7 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 	struct sde_kms *sde_kms = NULL;
 	struct sde_crtc *sde_crtc;
 	struct msm_drm_private *priv = NULL;
-	bool needs_hw_reset = false;
+	bool needs_hw_reset = false, is_cmd_mode;
 	uint32_t ln_cnt1, ln_cnt2;
 	unsigned int i;
 	int rc, ret = 0;
@@ -4674,6 +4706,14 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 
 	SDE_DEBUG_ENC(sde_enc, "\n");
 	SDE_EVT32(DRMID(drm_enc));
+
+#ifdef OPLUS_BUG_STABILITY
+/*Sachin Shukla@PSW.MM.Display.LCD.Stable,2019-03-26 add for dc backlight */
+	if (sde_enc->cur_master) {
+		sde_connector_update_backlight(sde_enc->cur_master->connector, false);
+		sde_connector_update_hbm(sde_enc->cur_master->connector);
+	}
+#endif /* OPLUS_BUG_STABILITY */
 
 	/* save this for later, in case of errors */
 	if (sde_enc->cur_master && sde_enc->cur_master->ops.get_wr_line_count)
@@ -4746,8 +4786,12 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		}
 	}
 
+	is_cmd_mode = sde_encoder_check_curr_mode(drm_enc,
+				MSM_DISPLAY_CMD_MODE);
+
 	if (_sde_encoder_is_dsc_enabled(drm_enc) && sde_enc->cur_master &&
-			!sde_enc->cur_master->cont_splash_enabled) {
+		((is_cmd_mode && sde_enc->cur_master->cont_splash_enabled) ||
+			!sde_enc->cur_master->cont_splash_enabled)) {
 		rc = _sde_encoder_dsc_setup(sde_enc, params);
 		if (rc) {
 			SDE_ERROR_ENC(sde_enc, "failed to setup DSC: %d\n", rc);
@@ -4843,6 +4887,11 @@ void sde_encoder_kickoff(struct drm_encoder *drm_enc, bool is_error)
 	}
 
 	SDE_ATRACE_END("encoder_kickoff");
+#ifdef OPLUS_BUG_STABILITY
+/*Sachin@PSW.MM.Display.LCD.Stable,2020-02-23 add for data dimming */
+   sde_connector_update_backlight(sde_enc->cur_master->connector, true);
+#endif /* OPLUS_BUG_STABILITY */
+
 }
 
 int sde_encoder_helper_reset_mixers(struct sde_encoder_phys *phys_enc,
