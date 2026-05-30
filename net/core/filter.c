@@ -22,6 +22,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/build_bug.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/fcntl.h>

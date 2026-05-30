@@ -87,4 +87,13 @@
 #define _Static_assert(expr, ...)
 #endif
 
+/*
+ * Backport-compatible spelling used by newer networking/BPF code.
+ * Unlike BUILD_BUG_ON(), static_assert() fails when @expr is false.
+ */
+#ifndef static_assert
+#define static_assert(expr, ...) __static_assert(expr, ##__VA_ARGS__, #expr)
+#define __static_assert(expr, msg, ...) _Static_assert(expr, msg)
+#endif
+
 #endif	/* _LINUX_BUILD_BUG_H */
