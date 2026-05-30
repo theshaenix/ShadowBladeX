@@ -120,6 +120,11 @@ static inline u64 ktime_get_boot_ns(void)
 	return ktime_to_ns(ktime_get_boottime());
 }
 
+static inline u64 ktime_get_boottime_ns(void)
+{
+	return ktime_get_boot_ns();
+}
+
 static inline u64 ktime_get_tai_ns(void)
 {
 	return ktime_to_ns(ktime_get_clocktai());

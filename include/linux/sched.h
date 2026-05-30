@@ -1811,6 +1811,13 @@ extern int sched_setscheduler_nocheck(struct task_struct *, int, const struct sc
 extern int sched_setattr(struct task_struct *, const struct sched_attr *);
 extern struct task_struct *idle_task(int cpu);
 
+static inline void sched_set_fifo(struct task_struct *p)
+{
+	struct sched_param sp = { .sched_priority = MAX_RT_PRIO / 2 };
+
+	sched_setscheduler_nocheck(p, SCHED_FIFO, &sp);
+}
+
 /**
  * is_idle_task - is the specified task an idle task?
  * @p: the task in question.
