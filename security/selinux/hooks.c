@@ -82,6 +82,7 @@
 #include <linux/syslog.h>
 #include <linux/user_namespace.h>
 #include <linux/export.h>
+#include <linux/selinux.h>
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/bpf.h>
@@ -119,7 +120,7 @@ __setup("enforcing=", enforcing_setup);
 #define selinux_enforcing_boot 1
 #endif
 
-int selinux_enabled_boot __initdata = 1;
+int selinux_enabled_boot = 1;
 #ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
 static int __init selinux_enabled_setup(char *str)
 {
@@ -130,6 +131,12 @@ static int __init selinux_enabled_setup(char *str)
 }
 __setup("selinux=", selinux_enabled_setup);
 #endif
+
+bool selinux_is_enabled(void)
+{
+	return selinux_enabled_boot && !selinux_disabled(&selinux_state);
+}
+EXPORT_SYMBOL_GPL(selinux_is_enabled);
 
 static unsigned int selinux_checkreqprot_boot =
 	CONFIG_SECURITY_SELINUX_CHECKREQPROT_VALUE;
