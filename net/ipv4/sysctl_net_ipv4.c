@@ -31,7 +31,6 @@
 static int zero;
 static int one = 1;
 static int three = 3;
-static int four = 4;
 static int hundred = 100;
 static int thousand = 1000;
 static int gso_max_segs = GSO_MAX_SEGS;

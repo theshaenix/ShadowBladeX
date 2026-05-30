@@ -1937,7 +1937,6 @@ continue_unlock:
 				if (flush_dirty_inode(page))
 					goto lock_node;
 			}
-write_node:
 			f2fs_wait_on_page_writeback(page, NODE, true, true);
 
 			if (!clear_page_dirty_for_io(page))

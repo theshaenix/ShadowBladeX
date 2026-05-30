@@ -5550,6 +5550,8 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 }
 #endif /* OPLUS_BUG_STABILITY */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wframe-larger-than="
 static int sde_crtc_atomic_check(struct drm_crtc *crtc,
 		struct drm_crtc_state *state)
 {
@@ -5852,6 +5854,7 @@ end:
 	_sde_crtc_rp_free_unused(&cstate->rp);
 	return rc;
 }
+#pragma GCC diagnostic pop
 
 /**
  * sde_crtc_get_num_datapath - get the number of datapath active
