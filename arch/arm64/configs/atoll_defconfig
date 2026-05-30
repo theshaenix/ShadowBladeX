@@ -121,9 +121,11 @@ CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
 CONFIG_CMA=y
 # CONFIG_CMA_DEBUG is not set
 CONFIG_ZSMALLOC=y
-# Reverted to baseline: lets kernel reclaim cheap clean file cache (SCAN_FILE) instead
-# of forcing balanced reclaim; reduced refault thrash observed with this off.
-# CONFIG_BALANCE_ANON_FILE_RECLAIM is not set
+# ON: kernel does balanced (SCAN_FRACT) reclaim with swappiness=100 and swaps idle anon
+# into zram instead of taking the SCAN_FILE shortcut (which dumps file cache and leaves
+# zram near-empty -> cold app launches). The "refault thrash" seen with it on earlier was
+# really the lmkd kill-storm (product.prop swap_free_low_percentage=100), now fixed to 10.
+CONFIG_BALANCE_ANON_FILE_RECLAIM=y
 # CONFIG_HAVE_LOW_MEMORY_KILLER is not set
 CONFIG_SECCOMP=y
 CONFIG_SCHED_HRTICK=y
