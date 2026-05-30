@@ -604,6 +604,7 @@ struct adreno_device {
 	void *zap_handle_ptr;
 	unsigned int soc_hw_rev;
 	bool gaming_bin;
+	bool perfcounter;
 };
 
 /**
