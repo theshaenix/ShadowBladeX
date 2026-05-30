@@ -60,6 +60,11 @@ export ARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
 
+# Large modules (qcacld-3.0 / qca-wifi-host-cmn) link thousands of objects on one
+# command line. Raise the stack limit so ARG_MAX (= stack/4) is big enough to avoid
+# "/bin/sh: Argument list too long" during the wlan.o link.
+ulimit -s unlimited 2>/dev/null || ulimit -s 65536
+
 # =====================[ START PROCESS ]=====================
 
 echo -e "\n🛠️  \033[1;34mStarting Kernel Build: $BASE_ZIPNAME\033[0m"
