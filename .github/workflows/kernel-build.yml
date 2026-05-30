@@ -6,6 +6,7 @@ on:
       - main
       - master
       - mcqueen
+      - mythos
       - wip
       - "copilot/**"
   pull_request:
