@@ -32,7 +32,8 @@ CONFIG_CPUSETS=y
 CONFIG_CGROUP_CPUACCT=y
 CONFIG_CGROUP_BPF=y
 # CONFIG_DEBUG_FS is not set
-CONFIG_SCHED_CORE_CTL=y
+# core_ctl off: matches baseline; avoids big-core isolation latency/jank (perf > battery)
+# CONFIG_SCHED_CORE_CTL is not set
 CONFIG_NAMESPACES=y
 # CONFIG_PID_NS is not set
 CONFIG_SCHED_AUTOGROUP=y
@@ -70,7 +71,10 @@ CONFIG_PARTITION_ADVANCED=y
 CONFIG_CFQ_GROUP_IOSCHED=y
 CONFIG_GKI_HACKS_TO_FIX=y
 # CONFIG_DEFAULT_ZEN is not set
-CONFIG_DEFAULT_MQ_DEADLINE=y
+# UFS runs on the legacy block layer here, so mq-deadline was unavailable and the
+# elevator fell back to noop. Default to the legacy deadline elevator instead.
+# CONFIG_DEFAULT_MQ_DEADLINE is not set
+CONFIG_DEFAULT_DEADLINE=y
 CONFIG_MQ_IOSCHED_DEADLINE=y
 # Writeback throttling (CoDel-based): stops background writeback starving foreground I/O
 CONFIG_BLK_WBT=y
@@ -117,7 +121,9 @@ CONFIG_DEFAULT_MMAP_MIN_ADDR=32768
 CONFIG_CMA=y
 # CONFIG_CMA_DEBUG is not set
 CONFIG_ZSMALLOC=y
-CONFIG_BALANCE_ANON_FILE_RECLAIM=y
+# Reverted to baseline: lets kernel reclaim cheap clean file cache (SCAN_FILE) instead
+# of forcing balanced reclaim; reduced refault thrash observed with this off.
+# CONFIG_BALANCE_ANON_FILE_RECLAIM is not set
 # CONFIG_HAVE_LOW_MEMORY_KILLER is not set
 CONFIG_SECCOMP=y
 CONFIG_SCHED_HRTICK=y
@@ -1093,7 +1099,8 @@ CONFIG_PM=y
 CONFIG_PM_OPP=y
 CONFIG_PM_CLK=y
 CONFIG_PM_GENERIC_DOMAINS=y
-CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+# Off: power-efficient WQ defers unbound work = added latency; baseline favored responsiveness
+# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
 CONFIG_PM_GENERIC_DOMAINS_SLEEP=y
 CONFIG_PM_GENERIC_DOMAINS_OF=y
 CONFIG_CPU_PM=y
