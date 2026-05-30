@@ -1036,7 +1036,10 @@ KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
 KBUILD_CFLAGS   += $(call cc-option,-Werror=implicit-int)
 
 # require functions to have arguments in prototypes, not empty 'int foo()'
-KBUILD_CFLAGS   += $(call cc-option,-Werror=strict-prototypes)
+# Downgraded error->warning: the legacy OPLUS vendor drivers (charger_ic, oppo_touchscreen)
+# are full of K&R 'int foo()' decls that newer clang flags but older clang did not. They run
+# fine; keep the warning visible but don't make it fatal so this 4.14 tree builds w/ new clang.
+KBUILD_CFLAGS   += $(call cc-option,-Wno-error=strict-prototypes)
 
 # Prohibit date/time macros, which would make the build non-deterministic
 KBUILD_CFLAGS   += $(call cc-option,-Werror=date-time)
