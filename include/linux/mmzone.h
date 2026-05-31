@@ -250,6 +250,7 @@ struct zone_reclaim_stat {
 };
 
 struct lruvec;
+struct page_vma_mapped_walk;
 
 #define ANON_AND_FILE 2
 
@@ -317,6 +318,7 @@ struct lrugen {
 
 void lru_gen_init_lrugen(struct lruvec *lruvec);
 void lru_gen_set_state(bool enable, bool main, bool swap);
+void lru_gen_scan_around(struct page_vma_mapped_walk *pvmw);
 
 #else /* CONFIG_LRU_GEN */
 
@@ -325,6 +327,10 @@ static inline void lru_gen_init_lrugen(struct lruvec *lruvec)
 }
 
 static inline void lru_gen_set_state(bool enable, bool main, bool swap)
+{
+}
+
+static inline void lru_gen_scan_around(struct page_vma_mapped_walk *pvmw)
 {
 }
 
@@ -740,6 +746,8 @@ extern struct page *mem_map;
  * per-zone basis.
  */
 struct bootmem_data;
+struct mm_walk_args;
+
 typedef struct pglist_data {
 	struct zone node_zones[MAX_NR_ZONES];
 	struct zonelist node_zonelists[MAX_ZONELISTS];
@@ -845,6 +853,10 @@ typedef struct pglist_data {
 
 	unsigned long		flags;
 
+#ifdef CONFIG_LRU_GEN
+	/* the per-node mm_struct walk state used by the aging */
+	struct mm_walk_args	*mm_walk_args;
+#endif
 	ZONE_PADDING(_pad2_)
 
 	/* Per-node vmstats */
