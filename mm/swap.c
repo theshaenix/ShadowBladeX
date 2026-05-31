@@ -373,9 +373,52 @@ static void __lru_cache_activate_page(struct page *page)
  * When a newly allocated page is not yet visible, so safe for non-atomic ops,
  * __SetPageReferenced(page) may be substituted for mark_page_accessed(page).
  */
+#ifdef CONFIG_LRU_GEN
+static void page_inc_usage(struct page *page)
+{
+	unsigned long usage;
+	unsigned long old_flags, new_flags;
+
+	if (PageUnevictable(page))
+		return;
+
+	/* see the comment on MAX_NR_TIERS */
+	do {
+		new_flags = old_flags = READ_ONCE(page->flags);
+
+		if (!(new_flags & BIT(PG_referenced))) {
+			new_flags |= BIT(PG_referenced);
+			continue;
+		}
+
+		if (!(new_flags & BIT(PG_workingset))) {
+			new_flags |= BIT(PG_workingset);
+			continue;
+		}
+
+		usage = new_flags & LRU_USAGE_MASK;
+		usage = min(usage + BIT(LRU_USAGE_PGOFF), LRU_USAGE_MASK);
+
+		new_flags &= ~LRU_USAGE_MASK;
+		new_flags |= usage;
+	} while (new_flags != old_flags &&
+		 cmpxchg(&page->flags, old_flags, new_flags) != old_flags);
+}
+#else
+static void page_inc_usage(struct page *page)
+{
+}
+#endif /* CONFIG_LRU_GEN */
+
 void mark_page_accessed(struct page *page)
 {
 	page = compound_head(page);
+
+	if (lru_gen_enabled()) {
+		page_inc_usage(page);
+		return;
+	}
+
 	if (!PageActive(page) && !PageUnevictable(page) &&
 			PageReferenced(page)) {
 
@@ -442,6 +485,12 @@ void lru_cache_add(struct page *page)
 {
 	VM_BUG_ON_PAGE(PageActive(page) && PageUnevictable(page), page);
 	VM_BUG_ON_PAGE(PageLRU(page), page);
+
+	/* see the comment in lru_gen_add_page() */
+	if (lru_gen_enabled() && !PageUnevictable(page) &&
+	    task_in_nonseq_fault() && !(current->flags & PF_MEMALLOC))
+		SetPageActive(page);
+
 	__lru_cache_add(page);
 }
 

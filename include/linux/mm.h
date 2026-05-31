@@ -1598,6 +1598,25 @@ static inline bool can_reuse_spf_vma(struct vm_area_struct *vma,
 extern int fixup_user_fault(struct task_struct *tsk, struct mm_struct *mm,
 			    unsigned long address, unsigned int fault_flags,
 			    bool *unlocked);
+
+static inline void task_enter_nonseq_fault(void)
+{
+	WARN_ON(current->in_nonseq_fault);
+
+	current->in_nonseq_fault = 1;
+}
+
+static inline void task_exit_nonseq_fault(void)
+{
+	WARN_ON(!current->in_nonseq_fault);
+
+	current->in_nonseq_fault = 0;
+}
+
+static inline bool task_in_nonseq_fault(void)
+{
+	return current->in_nonseq_fault;
+}
 #else
 static inline int handle_mm_fault(struct vm_area_struct *vma,
 		unsigned long address, unsigned int flags)
@@ -1613,6 +1632,19 @@ static inline int fixup_user_fault(struct task_struct *tsk,
 	/* should never happen if there's no MMU */
 	BUG();
 	return -EFAULT;
+}
+
+static inline void task_enter_nonseq_fault(void)
+{
+}
+
+static inline void task_exit_nonseq_fault(void)
+{
+}
+
+static inline bool task_in_nonseq_fault(void)
+{
+	return false;
 }
 #endif
 
