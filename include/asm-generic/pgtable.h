@@ -121,6 +121,19 @@ static inline int pmdp_clear_flush_young(struct vm_area_struct *vma,
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 #endif
 
+#ifndef arch_has_hw_pte_young
+/*
+ * Return whether the accessed bit is supported in hardware on the local CPU.
+ * Architectures that update the accessed bit in PTEs (and optionally non-leaf
+ * PMDs) automatically should override this. By default "false" means a page
+ * fault is taken on an old pte to set the accessed bit in software.
+ */
+static inline bool arch_has_hw_pte_young(void)
+{
+	return false;
+}
+#endif
+
 #ifndef __HAVE_ARCH_PTEP_GET_AND_CLEAR
 static inline pte_t ptep_get_and_clear(struct mm_struct *mm,
 				       unsigned long address,

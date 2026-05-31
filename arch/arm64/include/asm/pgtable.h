@@ -41,6 +41,7 @@
 #ifndef __ASSEMBLY__
 
 #include <asm/cmpxchg.h>
+#include <asm/cpufeature.h>
 #include <asm/fixmap.h>
 #include <linux/mmdebug.h>
 
@@ -770,6 +771,17 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
 }
 
 #define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
+
+/*
+ * Some architectures (e.g. arm64 v8.2+) set the accessed bit in PTEs
+ * automatically in hardware. The multigen LRU uses this to decide whether
+ * the page-table aging walk can rely on the access flag being maintained.
+ */
+static inline bool arch_has_hw_pte_young(void)
+{
+	return system_has_hw_af();
+}
+#define arch_has_hw_pte_young		arch_has_hw_pte_young
 
 #define kc_vaddr_to_offset(v)	((v) & ~VA_START)
 #define kc_offset_to_vaddr(o)	((o) | VA_START)

@@ -1239,6 +1239,21 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
 		.matches = has_hw_dbm,
 		.cpu_enable = cpu_enable_hw_dbm,
 	},
+	{
+		/*
+		 * Hardware update of the Access flag. Detection only; the
+		 * actual TCR_HA enablement is done in __cpu_setup (proc.S).
+		 * Used by arch_has_hw_pte_young() for the multigen LRU.
+		 */
+		.desc = "Hardware update of the Access flag",
+		.capability = ARM64_HW_AF,
+		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+		.sys_reg = SYS_ID_AA64MMFR1_EL1,
+		.sign = FTR_UNSIGNED,
+		.field_pos = ID_AA64MMFR1_HADBS_SHIFT,
+		.min_field_value = 1,
+		.matches = has_cpuid_feature,
+	},
 #endif
 #ifdef CONFIG_ARM64_SSBD
 	{
