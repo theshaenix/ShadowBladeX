@@ -424,14 +424,14 @@ void ida_destroy(struct ida *ida)
 	struct radix_tree_iter iter;
 	void __rcu **slot;
 
-	xa_lock_irqsave(&ida->ida_rt, flags);
+	spin_lock_irqsave(&ida_lock, flags);
 	radix_tree_for_each_slot(slot, &ida->ida_rt, &iter, 0) {
 		struct ida_bitmap *bitmap = rcu_dereference_raw(*slot);
 		if (!radix_tree_exception(bitmap))
 			kfree(bitmap);
 		radix_tree_iter_delete(&ida->ida_rt, &iter, slot);
 	}
-	xa_unlock_irqrestore(&ida->ida_rt, flags);
+	spin_unlock_irqrestore(&ida_lock, flags);
 }
 EXPORT_SYMBOL(ida_destroy);
 
