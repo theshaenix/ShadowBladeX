@@ -50,7 +50,9 @@ config IOSCHED_ZEN
 
 choice
 	prompt "Default I/O scheduler"
-	default DEFAULT_ZEN
+	default DEFAULT_MQ_DEADLINE if MQ_IOSCHED_DEADLINE
+	default DEFAULT_ZEN if IOSCHED_ZEN
+	default DEFAULT_NOOP
 	help
 	  Select the I/O scheduler which will be used by default.
 
@@ -58,9 +60,17 @@ choice
 		bool "Zen"
 		depends on IOSCHED_ZEN
 
+	config DEFAULT_KYBER
+		bool "Kyber"
+		depends on MQ_IOSCHED_KYBER
+
 	config DEFAULT_MQ_DEADLINE
 		bool "MQ deadline"
 		depends on MQ_IOSCHED_DEADLINE
+
+	config DEFAULT_BFQ
+		bool "BFQ"
+		depends on IOSCHED_BFQ
 
 	config DEFAULT_CFQ
 		bool "CFQ"
@@ -77,7 +87,9 @@ endchoice
 config DEFAULT_IOSCHED
 	string
 	default "zen" if DEFAULT_ZEN
+	default "kyber" if DEFAULT_KYBER
 	default "mq-deadline" if DEFAULT_MQ_DEADLINE
+	default "bfq" if DEFAULT_BFQ
 	default "cfq" if DEFAULT_CFQ
 	default "deadline" if DEFAULT_DEADLINE
 	default "noop" if DEFAULT_NOOP
