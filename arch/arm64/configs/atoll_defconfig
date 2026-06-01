@@ -1146,3 +1146,8 @@ CONFIG_LZ4_COMPRESS=y
 
 # MSM Thermal
 CONFIG_MSM_THERMAL_SIMPLE=y
+
+# KernelSU-Next + SUSFS (manual hooks for 4.14; kprobe syscall hook is 5.10+)
+CONFIG_KSU=y
+CONFIG_KSU_MANUAL_HOOK=y
+CONFIG_KSU_SUSFS=y
