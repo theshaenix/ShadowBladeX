@@ -116,6 +116,7 @@ struct glink_core_rx_intent {
  * @rx_pipe:	pipe object for receive FIFO
  * @tx_pipe:	pipe object for transmit FIFO
  * @irq:	IRQ for signaling incoming events
+ * @irq_wake_enabled: whether @irq is configured as a wakeup source
  * @kworker:	kworker to handle rx_done work
  * @task:	kthread running @kworker
  * @rx_work:	worker for handling received control messages
@@ -142,6 +143,7 @@ struct qcom_glink {
 	struct qcom_glink_pipe *tx_pipe;
 
 	int irq;
+	bool irq_wake_enabled;
 
 	struct kthread_worker kworker;
 	struct task_struct *task;
@@ -2061,21 +2063,20 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 	else
 		irqflags = IRQF_SHARED;
 
-	ret = devm_request_irq(dev, irq,
-			       qcom_glink_native_intr,
-			       irqflags,
+#ifdef OPLUS_FEATURE_MODEM_DATA_NWPOWER
+	if (glink_native_irq_index < GLINK_NATIVE_IRQ_NUM_MAX) {
+		snprintf(glink_native_irq_names[glink_native_irq_index],
+			 GLINK_NATIVE_IRQ_NAME_LEN, "glink-native-%s",
+			 glink->name);
+		glink_native_irq_name =
+			glink_native_irq_names[glink_native_irq_index++];
+	}
+	ret = devm_request_irq(dev, irq, qcom_glink_native_intr, irqflags,
+			       glink_native_irq_name, glink);
+#else
+	ret = devm_request_irq(dev, irq, qcom_glink_native_intr, irqflags,
 			       "glink-native", glink);
-
-		if(glink_native_irq_index < GLINK_NATIVE_IRQ_NUM_MAX){
-			snprintf(glink_native_irq_names[glink_native_irq_index], GLINK_NATIVE_IRQ_NAME_LEN, "glink-native-%s", glink->name);
-			glink_native_irq_name = glink_native_irq_names[glink_native_irq_index];
-			glink_native_irq_index++;
-		}
-		ret = devm_request_irq(dev, irq,
-					   qcom_glink_native_intr,
-					   IRQF_NO_SUSPEND | IRQF_SHARED,
-					   glink_native_irq_name, glink);
-		pr_err("qcom_glink_native_probe: def:%s final:%s index:%d irq:%d\n", glink_native_irq_names[0], glink_native_irq_name, glink_native_irq_index,irq);
+#endif
 
 	if (ret) {
 		dev_err(dev, "failed to request IRQ\n");
@@ -2083,13 +2084,11 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 	}
 
 	glink->irq = irq;
-	ret = enable_irq_wake(glink->irq);
-	if (ret)
-		dev_err(dev, "failed to set irq wake\n");
-
 	ret = enable_irq_wake(irq);
 	if (ret < 0)
 		dev_err(dev, "enable_irq_wake() failed on %d\n", irq);
+	else
+		glink->irq_wake_enabled = true;
 
 	size = of_property_count_u32_elems(dev->of_node, "cpu-affinity");
 	if (size > 0) {
@@ -2120,6 +2119,8 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 	return glink;
 
 unregister:
+	if (glink->irq_wake_enabled)
+		disable_irq_wake(glink->irq);
 	subsys_unregister_early_notifier(glink->name, XPORT_LAYER_NOTIF);
 	kthread_stop(glink->task);
 	mbox_free_channel(glink->mbox_chan);
@@ -2142,6 +2143,8 @@ void qcom_glink_native_remove(struct qcom_glink *glink)
 
 	subsys_unregister_early_notifier(glink->name, XPORT_LAYER_NOTIF);
 	qcom_glink_notif_reset(glink);
+	if (glink->irq_wake_enabled)
+		disable_irq_wake(glink->irq);
 	disable_irq(glink->irq);
 	qcom_glink_cancel_rx_work(glink);
 
