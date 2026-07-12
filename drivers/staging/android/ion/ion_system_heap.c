@@ -793,10 +793,13 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *data)
 #ifdef CONFIG_OPLUS_ION_BOOSTPOOL
 	boost_root_dir = proc_mkdir("boost_pool", NULL);
 	if (!IS_ERR(boost_root_dir)) {
-		/* on low memory target, we should not set 128Mib on camera pool. */
-		/* TODO set by total ram pages */
+		/*
+		 * Keep a small launch buffer without permanently pinning
+		 * 128 MiB. The shrinker preserves this watermark under
+		 * pressure.
+		 */
 		heap->cam_pool = boost_pool_create(heap, ION_FLAG_CAMERA_BUFFER,
-						   128 * 256,
+						   32 * 256,
 						   boost_root_dir, "camera");
 		if (!heap->cam_pool)
 			pr_err("%s: create boost_pool camera failed!\n",
