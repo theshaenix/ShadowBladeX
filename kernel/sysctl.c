@@ -360,6 +360,20 @@ static int sched_frame_rate_handler(struct ctl_table *table, int write,
 }
 #endif /* OPLUS_FEATURE_UIFIRST */
 
+#if defined(OPLUS_FEATURE_FG_IO_OPT) && defined(CONFIG_OPPO_FG_IO_OPT)
+unsigned int sysctl_fg_io_opt = 1;
+#endif
+
+#ifdef OPLUS_FEATURE_EDTASK_IMPROVE
+int sysctl_ed_task_enabled = 1;
+#endif
+
+#ifdef CONFIG_OPLUS_FEATURE_PANIC_FLUSH
+unsigned int sysctl_ext4_fsync_enable = 1;
+unsigned int ext4_fsync_enable_status;
+unsigned long sysctl_blkdev_issue_flush_count;
+#endif
+
 #ifdef CONFIG_COMPACTION
 static int min_extfrag_threshold;
 static int max_extfrag_threshold = 1000;
@@ -529,6 +543,40 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= sched_updown_migrate_handler,
 	},
+#if defined(OPLUS_FEATURE_FG_IO_OPT) && defined(CONFIG_OPPO_FG_IO_OPT)
+	{
+		.procname	= "fg_io_opt",
+		.data		= &sysctl_fg_io_opt,
+		.maxlen		= sizeof(sysctl_fg_io_opt),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
+#ifdef OPLUS_FEATURE_EDTASK_IMPROVE
+	{
+		.procname	= "ed_task_enabled",
+		.data		= &sysctl_ed_task_enabled,
+		.maxlen		= sizeof(sysctl_ed_task_enabled),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
+#ifdef CONFIG_OPLUS_FEATURE_PANIC_FLUSH
+	{
+		.procname	= "ext4_fsync_enable",
+		.data		= &sysctl_ext4_fsync_enable,
+		.maxlen		= sizeof(sysctl_ext4_fsync_enable),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "blkdev_issue_flush_count",
+		.data		= &sysctl_blkdev_issue_flush_count,
+		.maxlen		= sizeof(sysctl_blkdev_issue_flush_count),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
 	{
 		.procname       = "sched_energy_aware",
 		.data           = &sysctl_sched_energy_aware,

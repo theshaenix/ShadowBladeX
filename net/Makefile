@@ -92,4 +92,10 @@ obj-$(CONFIG_QRTR)		+= qrtr/
 obj-$(CONFIG_NET_NCSI)		+= ncsi/
 obj-$(CONFIG_RMNET_DATA) += rmnet_data/
 obj-$(CONFIG_RMNET_USB) += rmnet_usb/
+
+# Vendor connectivity features retained from the device kernel.
+obj-y				+= oplus_sla/
+obj-y				+= oplus_nf_hooks/
+obj-y				+= oplus_dhcp/
+obj-y				+= oplus_nwpower/
 obj-$(CONFIG_XDP_SOCKETS)	+= xdp/
