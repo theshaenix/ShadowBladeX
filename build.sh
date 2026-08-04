@@ -106,6 +106,12 @@ make -j$(nproc) O=$OUT_DIR \
   -e 's/warning:/\x1b[1;33mwarning:\x1b[0m/g' \
   -e 's/error:/\x1b[1;31merror:\x1b[0m/g'
 
+BUILD_STATUS=${PIPESTATUS[0]}
+if [ "$BUILD_STATUS" -ne 0 ]; then
+  echo -e "\n❌ \033[1;31mKernel compilation failed (see $OUT_DIR/build.log).\033[0m"
+  exit "$BUILD_STATUS"
+fi
+
 # =====================[ CHECK IMAGE ]=====================
 
 KERNEL_IMG=$OUT_DIR/arch/arm64/boot/Image.gz-dtb
