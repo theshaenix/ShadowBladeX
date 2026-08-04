@@ -72,9 +72,12 @@ void apply_alternatives(void *start, size_t length);
 	"663:\n\t"							\
 	newinstr "\n"							\
 	"664:\n\t"							\
+<<<<<<< HEAD
+=======
+	".popsection\n\t"						\
+>>>>>>> lin/lineage-20
 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
-	".org	. - (662b-661b) + (664b-663b)\n\t"			\
-	".previous\n"							\
+	".org	. - (662b-661b) + (664b-663b)\n"			\
 	".endif\n"
 
 #define __ALTERNATIVE_CFG_CB(oldinstr, feature, cfg_enabled, cb)	\
@@ -114,9 +117,9 @@ void apply_alternatives(void *start, size_t length);
 	.popsection
 	.pushsection .altinstr_replacement, "ax"
 663:	\insn2
-664:	.popsection
-	.org	. - (664b-663b) + (662b-661b)
+664:	.org	. - (664b-663b) + (662b-661b)
 	.org	. - (662b-661b) + (664b-663b)
+	.popsection
 	.endif
 .endm
 
@@ -186,11 +189,11 @@ void apply_alternatives(void *start, size_t length);
  */
 .macro alternative_endif
 664:
+	.org	. - (664b-663b) + (662b-661b)
+	.org	. - (662b-661b) + (664b-663b)
 	.if .Lasm_alt_mode==0
 	.popsection
 	.endif
-	.org	. - (664b-663b) + (662b-661b)
-	.org	. - (662b-661b) + (664b-663b)
 .endm
 
 /*

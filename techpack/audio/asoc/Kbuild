@@ -169,14 +169,7 @@ ifdef CONFIG_QTI_PP
 	PLATFORM_OBJS += msm-qti-pp-config.o
 endif
 
-#ifdef OPLUS_ARCH_EXTENDS
-#/*Jianfeng.Qiu@MULTIMEDIA.AUDIODRIVER.MACHINE, 2019/02/03, Add for audio driver kevent log*/
-ifdef CONFIG_OPPO_KEVENT_UPLOAD
-	PLATFORM_OBJS += oppo_mm_audio_kevent.o
-endif
-#endif /* OPLUS_ARCH_EXTENDS */
-
-LINUX_INC +=	-Iinclude/linux
+LINUX_INC +=	-I$(srctree)/include/linux
 
 INCS +=		$(COMMON_INC) \
 		$(UAPI_INC)
@@ -190,6 +183,7 @@ CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DANI_OS_TYPE_ANDROID=6 \
 		-DPTT_SOCK_SVC_ENABLE \
 		-Wall\
+		-Werror\
 		-D__linux__
 
 KBUILD_CPPFLAGS += $(CDEFINES)

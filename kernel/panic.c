@@ -28,13 +28,10 @@
 #include <linux/console.h>
 #include <linux/bug.h>
 #include <linux/ratelimit.h>
+#include <linux/sysfs.h>
 #define CREATE_TRACE_POINTS
 #include <trace/events/exception.h>
 #include <soc/qcom/minidump.h>
-#ifdef OPLUS_FEATURE_AGINGTEST
-/* Yong.Qian@bsp.kernel.stability, 2020/5/14, Add for dump reason */
-#include <linux/soc/qcom/smem.h>
-#endif /*OPLUS_FEATURE_AGINGTEST*/
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
@@ -46,6 +43,7 @@ static int pause_on_oops_flag;
 static DEFINE_SPINLOCK(pause_on_oops_lock);
 bool crash_kexec_post_notifiers;
 int panic_on_warn __read_mostly;
+static unsigned int warn_limit __read_mostly;
 
 int panic_timeout = CONFIG_PANIC_TIMEOUT;
 EXPORT_SYMBOL_GPL(panic_timeout);
@@ -53,6 +51,45 @@ EXPORT_SYMBOL_GPL(panic_timeout);
 ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
 EXPORT_SYMBOL(panic_notifier_list);
+
+#ifdef CONFIG_SYSCTL
+static struct ctl_table kern_panic_table[] = {
+	{
+		.procname       = "warn_limit",
+		.data           = &warn_limit,
+		.maxlen         = sizeof(warn_limit),
+		.mode           = 0644,
+		.proc_handler   = proc_douintvec,
+	},
+	{ }
+};
+
+static __init int kernel_panic_sysctls_init(void)
+{
+	register_sysctl_init("kernel", kern_panic_table);
+	return 0;
+}
+late_initcall(kernel_panic_sysctls_init);
+#endif
+
+static atomic_t warn_count = ATOMIC_INIT(0);
+
+#ifdef CONFIG_SYSFS
+static ssize_t warn_count_show(struct kobject *kobj, struct kobj_attribute *attr,
+			       char *page)
+{
+	return sysfs_emit(page, "%d\n", atomic_read(&warn_count));
+}
+
+static struct kobj_attribute warn_count_attr = __ATTR_RO(warn_count);
+
+static __init int kernel_panic_sysfs_init(void)
+{
+	sysfs_add_file_to_group(kernel_kobj, &warn_count_attr.attr, NULL);
+	return 0;
+}
+late_initcall(kernel_panic_sysfs_init);
+#endif
 
 static long no_blink(int state)
 {
@@ -129,12 +166,18 @@ void nmi_panic(struct pt_regs *regs, const char *msg)
 }
 EXPORT_SYMBOL(nmi_panic);
 
-#ifdef CONFIG_OPLUS_FEATURE_PANIC_FLUSH
-/* yanwu@TECH.Storage.FS.oF2FS, 2019/09/13, flush device cache in panic if necessary */
-extern int panic_flush_device_cache(int timeout);
-void dumpcpuregs(struct pt_regs *pt_regs);
-extern int get_download_mode(void);
-#endif
+void check_panic_on_warn(const char *origin)
+{
+	unsigned int limit;
+
+	if (panic_on_warn)
+		panic("%s: panic_on_warn set ...\n", origin);
+
+	limit = READ_ONCE(warn_limit);
+	if (atomic_inc_return(&warn_count) >= limit && limit)
+		panic("%s: system warned too often (kernel.warn_limit is %d)",
+		      origin, limit);
+}
 
 /**
  *	panic - halt the system
@@ -152,10 +195,17 @@ void panic(const char *fmt, ...)
 	int state = 0;
 	int old_cpu, this_cpu;
 	bool _crash_kexec_post_notifiers = crash_kexec_post_notifiers;
-#ifdef OPLUS_FEATURE_AGINGTEST
-/* Yong.Qian@bsp.kernel.stability, 2020/5/14, Add for dump reason */
-	char *function_name;
-#endif /*OPLUS_FEATURE_AGINGTEST*/
+
+	if (panic_on_warn) {
+		/*
+		 * This thread may hit another WARN() in the panic path.
+		 * Resetting this prevents additional WARN() from panicking the
+		 * system on this thread.  Other threads are blocked by the
+		 * panic_mutex in panic().
+		 */
+		panic_on_warn = 0;
+	}
+
 	trace_kernel_panic(0);
 
 	/*
@@ -194,18 +244,7 @@ void panic(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	dump_stack_minidump(0);
-#ifdef CONFIG_OPLUS_FEATURE_PANIC_FLUSH
-/* yanwu@TECH.Storage.FS.oF2FS, 2019/09/13, flush device cache in panic if necessary */
-	dumpcpuregs(0);
-	if(!get_download_mode())
-		panic_flush_device_cache(2000);
-#endif
 	pr_emerg("Kernel panic - not syncing: %s\n", buf);
-#ifdef OPLUS_FEATURE_AGINGTEST
-/* Yong.Qian@bsp.kernel.stability, 2020/5/14, Add for dump reason */
-	function_name = parse_function_builtin_return_address((unsigned long)__builtin_return_address(0));
-	save_dump_reason_to_smem(buf, function_name);
-#endif /*OPLUS_FEATURE_AGINGTEST*/
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
@@ -570,16 +609,7 @@ void __warn(const char *file, int line, void *caller, unsigned taint,
 	if (args)
 		vprintk(args->fmt, args->args);
 
-	if (panic_on_warn) {
-		/*
-		 * This thread may hit another WARN() in the panic path.
-		 * Resetting this prevents additional WARN() from panicking the
-		 * system on this thread.  Other threads are blocked by the
-		 * panic_mutex in panic().
-		 */
-		panic_on_warn = 0;
-		panic("panic_on_warn set ...\n");
-	}
+	check_panic_on_warn("kernel");
 
 	print_modules();
 
@@ -634,7 +664,7 @@ EXPORT_SYMBOL(warn_slowpath_null);
  */
 __visible void __stack_chk_fail(void)
 {
-	panic("stack-protector: Kernel stack is corrupted in: %p\n",
+	panic("stack-protector: Kernel stack is corrupted in: %pB\n",
 		__builtin_return_address(0));
 }
 EXPORT_SYMBOL(__stack_chk_fail);
