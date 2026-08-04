@@ -108,11 +108,8 @@ static void msg_submit(struct mbox_chan *chan)
 		/* kick start the timer immediately to avoid delays */
 		spin_lock_irqsave(&chan->mbox->poll_hrt_lock, flags);
 		hrtimer_start(&chan->mbox->poll_hrt, 0, HRTIMER_MODE_REL);
-<<<<<<< HEAD
-=======
 		spin_unlock_irqrestore(&chan->mbox->poll_hrt_lock, flags);
 	}
->>>>>>> lin/lineage-20
 }
 
 static void tx_tick(struct mbox_chan *chan, int r)

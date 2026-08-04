@@ -72,10 +72,7 @@ void apply_alternatives(void *start, size_t length);
 	"663:\n\t"							\
 	newinstr "\n"							\
 	"664:\n\t"							\
-<<<<<<< HEAD
-=======
 	".popsection\n\t"						\
->>>>>>> lin/lineage-20
 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
 	".org	. - (662b-661b) + (664b-663b)\n"			\
 	".endif\n"
