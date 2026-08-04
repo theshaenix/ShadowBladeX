@@ -66,6 +66,25 @@ export CROSS_COMPILE=aarch64-linux-
 # Allow constrained builders to lower parallelism without editing this script.
 JOBS="${JOBS:-$(nproc)}"
 
+# The filtered live output keeps routine builds readable, while build.log keeps
+# the complete compiler output.  When a target fails, show the first failure
+# and the preceding lines from that raw log; this is usually where clang (or a
+# host tool) explains why the subsequent missing-object errors occurred.
+show_first_failure_context() {
+  local failure_line context_start context_end
+
+  failure_line=$(grep -n -m1 -E \
+    '(^|: )(fatal )?error:|fatal:|clang:.*(unable|crash)|make(\[[0-9]+\])?: \*\*\*' \
+    "$OUT_DIR/build.log" | cut -d: -f1)
+
+  if [ -n "$failure_line" ]; then
+    context_start=$((failure_line > 40 ? failure_line - 40 : 1))
+    context_end=$((failure_line + 20))
+    echo -e "\n🔎 \033[1;36mFirst failure context from $OUT_DIR/build.log:\033[0m"
+    sed -n "${context_start},${context_end}p" "$OUT_DIR/build.log"
+  fi
+}
+
 # =====================[ START PROCESS ]=====================
 
 echo -e "\n🛠️  \033[1;34mStarting Kernel Build: $BASE_ZIPNAME\033[0m"
@@ -113,6 +132,7 @@ make -j"$JOBS" O=$OUT_DIR \
 
 BUILD_STATUS=${PIPESTATUS[0]}
 if [ "$BUILD_STATUS" -ne 0 ]; then
+  show_first_failure_context
   echo -e "\n❌ \033[1;31mKernel compilation failed (see $OUT_DIR/build.log).\033[0m"
   exit "$BUILD_STATUS"
 fi
