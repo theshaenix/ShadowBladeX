@@ -46,6 +46,7 @@ obj-y += printk/
 obj-y += irq/
 obj-y += rcu/
 obj-y += livepatch/
+obj-$(CONFIG_OPLUS_SECURE_GUARD) += keventupload/
 
 obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
 obj-$(CONFIG_FREEZER) += freezer.o
@@ -116,6 +117,11 @@ obj-$(CONFIG_CONTEXT_TRACKING) += context_tracking.o
 obj-$(CONFIG_TORTURE_TEST) += torture.o
 
 obj-$(CONFIG_HAS_IOMEM) += memremap.o
+
+# Oplus UIFirst scheduler hooks and heavy-load policy.  The callers are
+# retained by the vendor merge, so their provider objects must be linked too.
+obj-y += uifirst/
+obj-y += oppo_special_opt/
 
 $(obj)/configs.o: $(obj)/config_data.h
 

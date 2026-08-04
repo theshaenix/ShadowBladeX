@@ -337,6 +337,29 @@ static int max_sched_tunable_scaling = SCHED_TUNABLESCALING_END-1;
 #endif /* CONFIG_SMP */
 #endif /* CONFIG_SCHED_DEBUG */
 
+#ifdef OPLUS_FEATURE_UIFIRST
+/* Oplus scheduler policy state, controlled through /proc/sys/kernel. */
+int sysctl_uifirst_enabled = 1;
+int sysctl_launcher_boost_enabled;
+int sysctl_cpu_multi_thread;
+int sysctl_slide_boost_enabled;
+int sysctl_boost_task_threshold = 51;
+#ifdef CONFIG_CAMERA_OPT
+int sysctl_camera_opt_enabled;
+#endif
+int sysctl_frame_rate = 60;
+
+static int sched_frame_rate_handler(struct ctl_table *table, int write,
+				    void __user *buffer, size_t *lenp,
+				    loff_t *ppos)
+{
+	if (write && *ppos)
+		*ppos = 0;
+
+	return proc_dointvec(table, write, buffer, lenp, ppos);
+}
+#endif /* OPLUS_FEATURE_UIFIRST */
+
 #ifdef CONFIG_COMPACTION
 static int min_extfrag_threshold;
 static int max_extfrag_threshold = 1000;
@@ -1489,6 +1512,59 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 #endif
+#ifdef OPLUS_FEATURE_UIFIRST
+	{
+		.procname	= "uifirst_enabled",
+		.data		= &sysctl_uifirst_enabled,
+		.maxlen		= sizeof(sysctl_uifirst_enabled),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "launcher_boost_enabled",
+		.data		= &sysctl_launcher_boost_enabled,
+		.maxlen		= sizeof(sysctl_launcher_boost_enabled),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "cpu_multi_thread",
+		.data		= &sysctl_cpu_multi_thread,
+		.maxlen		= sizeof(sysctl_cpu_multi_thread),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "slide_boost_enabled",
+		.data		= &sysctl_slide_boost_enabled,
+		.maxlen		= sizeof(sysctl_slide_boost_enabled),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "boost_task_threshold",
+		.data		= &sysctl_boost_task_threshold,
+		.maxlen		= sizeof(sysctl_boost_task_threshold),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+	{
+		.procname	= "frame_rate",
+		.data		= &sysctl_frame_rate,
+		.maxlen		= sizeof(sysctl_frame_rate),
+		.mode		= 0666,
+		.proc_handler	= sched_frame_rate_handler,
+	},
+#ifdef CONFIG_CAMERA_OPT
+	{
+		.procname	= "camera_opt_enable",
+		.data		= &sysctl_camera_opt_enabled,
+		.maxlen		= sizeof(sysctl_camera_opt_enabled),
+		.mode		= 0666,
+		.proc_handler	= proc_dointvec,
+	},
+#endif
+#endif /* OPLUS_FEATURE_UIFIRST */
 	{ }
 };
 
