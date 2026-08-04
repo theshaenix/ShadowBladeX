@@ -2049,7 +2049,8 @@ endif
 
 LINUX_INC :=	-Iinclude
 
-INCS :=		$(HDD_INC) \
+INCS :=		-I $(srctree)/$(WLAN_ROOT)/inc \
+		$(HDD_INC) \
 		$(SYNC_INC) \
 		$(DSC_INC) \
 		$(EPPING_INC) \
