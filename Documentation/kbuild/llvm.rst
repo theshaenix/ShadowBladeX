@@ -59,10 +59,6 @@ They can be enabled individually. The full list of the parameters:
 	  READELF=llvm-readelf HOSTCC=clang HOSTCXX=clang++ HOSTAR=llvm-ar \\
 	  HOSTLD=ld.lld
 
-<<<<<<< HEAD
-Currently, the integrated assembler is disabled by default. You can pass
-`LLVM_IAS=1` to enable it.
-=======
 The integrated assembler is enabled by default. You can pass ``LLVM_IAS=0`` to
 disable it.
 
@@ -128,7 +124,6 @@ yet. Bug reports are always welcome at the issue tracker below!
    * - x86
      - Supported
      - ``LLVM=1``
->>>>>>> lin/lineage-20
 
 Getting Help
 ------------
