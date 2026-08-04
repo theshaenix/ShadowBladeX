@@ -1,0 +1,101 @@
+name: Kernel Build
+
+on:
+  push:
+    branches:
+      - mcqueen-ksu
+      - mcqueen
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CCACHE_DIR: ~/.ccache
+      KEEP_CCACHE: "1"
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache zip
+
+      - name: Cache toolchains and AnyKernel3
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/toolchains/clang
+            ~/toolchains/gcc-aarch64-linux-gnu-9.3
+            ~/AnyKernel3
+          key: ${{ runner.os }}-kernel-tools-v1
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ github.ref_name }}-
+            ${{ runner.os }}-ccache-
+
+      - name: Build kernel
+        run: bash ./bash.sh
+
+      - name: Collect artifact path
+        id: artifact
+        run: |
+          shopt -s nullglob
+          ZIP_FILES=(~/AnyKernel3/*.zip)
+          if [ ${#ZIP_FILES[@]} -eq 0 ]; then
+            echo "No zip artifact found in ~/AnyKernel3."
+            exit 1
+          fi
+          ZIP_PATH="$(ls -t "${ZIP_FILES[@]}" | head -n 1)"
+          ZIP_NAME="$(basename "$ZIP_PATH")"
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+          echo "zip_name=$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          echo "ZIP_PATH=$ZIP_PATH" >> "$GITHUB_ENV"
+          echo "ZIP_NAME=$ZIP_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact.outputs.zip_name }}
+          path: ${{ steps.artifact.outputs.zip_path }}
+
+      - name: Upload to Telegram
+        if: ${{ github.event_name != 'pull_request' && env.TELEGRAM_BOT_TOKEN != '' && env.TELEGRAM_CHAT_ID != '' }}
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          COMMIT_MSG=$(git log -1 --pretty=format:"%s" 2>/dev/null | head -c 200 || echo "(unavailable)")
+          BUILD_DATE=$(date -u "+%Y-%m-%d %H:%M UTC")
+          if [ ! -f "${ZIP_PATH}" ]; then
+            echo "Zip artifact not found at: ${ZIP_PATH}"
+            exit 1
+          fi
+          FILE_SIZE=$(du -sh "${ZIP_PATH}" | cut -f1)
+          escape_html() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
+          CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>By:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
+            "$(escape_html "${BRANCH_NAME}")" \
+            "${SHORT_SHA}" \
+            "$(escape_html "${COMMIT_MSG}")" \
+            "$(escape_html "${ACTOR}")" \
+            "${BUILD_DATE}" \
+            "${FILE_SIZE}" \
+            "$(escape_html "${ZIP_NAME}")")
+          curl -fsSL -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendDocument" \
+            --form-string chat_id="${TELEGRAM_CHAT_ID}" \
+            -F "document=@${ZIP_PATH}" \
+            --form-string caption="${CAPTION}" \
+            --form-string parse_mode="HTML"
