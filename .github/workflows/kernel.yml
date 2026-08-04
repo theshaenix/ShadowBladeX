@@ -47,7 +47,7 @@ jobs:
             ${{ runner.os }}-ccache-
 
       - name: Build kernel
-        run: bash ./bash.sh
+        run: bash ./build.sh
 
       - name: Collect artifact path
         id: artifact
