@@ -48,6 +48,11 @@ struct anon_vma {
 	 */
 	atomic_t refcount;
 
+#ifdef OPLUS_BUG_STABILITY
+	/* Oplus recursive-fork protection accounting. */
+	unsigned degree;
+#endif
+
 	/*
 	 * Count of child anon_vmas. Equals to the count of all anon_vmas that
 	 * have ->parent pointing to this one, including itself.

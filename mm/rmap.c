@@ -84,6 +84,9 @@ static inline struct anon_vma *anon_vma_alloc(void)
 		atomic_set(&anon_vma->refcount, 1);
 		anon_vma->num_children = 0;
 		anon_vma->num_active_vmas = 0;
+#ifdef OPLUS_BUG_STABILITY
+		anon_vma->degree = 1;
+#endif
 		anon_vma->parent = anon_vma;
 		/*
 		 * Initialise the anon_vma root to point to itself. If called
@@ -202,6 +205,9 @@ int __anon_vma_prepare(struct vm_area_struct *vma)
 		vma->anon_vma = anon_vma;
 		anon_vma_chain_link(vma, avc, anon_vma);
 		anon_vma->num_active_vmas++;
+#ifdef OPLUS_BUG_STABILITY
+		anon_vma->degree++;
+#endif
 		allocated = NULL;
 		avc = NULL;
 	}
@@ -442,6 +448,9 @@ int anon_vma_fork(struct vm_area_struct *vma, struct vm_area_struct *pvma)
 	anon_vma_lock_write(anon_vma);
 	anon_vma_chain_link(vma, avc, anon_vma);
 	anon_vma->parent->num_children++;
+#ifdef OPLUS_BUG_STABILITY
+	anon_vma->parent->degree++;
+#endif
 	anon_vma_unlock_write(anon_vma);
 
 	return 0;
@@ -474,6 +483,9 @@ void unlink_anon_vmas(struct vm_area_struct *vma)
 		 */
 		if (RB_EMPTY_ROOT(&anon_vma->rb_root.rb_root)) {
 			anon_vma->parent->num_children--;
+#ifdef OPLUS_BUG_STABILITY
+			anon_vma->parent->degree--;
+#endif
 			continue;
 		}
 
@@ -482,6 +494,10 @@ void unlink_anon_vmas(struct vm_area_struct *vma)
 	}
 	if (vma->anon_vma)
 		vma->anon_vma->num_active_vmas--;
+#ifdef OPLUS_BUG_STABILITY
+	if (vma->anon_vma)
+		vma->anon_vma->degree--;
+#endif
 	unlock_anon_vma_root(root);
 
 	/*
