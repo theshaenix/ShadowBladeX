@@ -9,5 +9,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
-obj-y += stub/ audio/ audio/4.0/
+# audio/ selects audio/4.0/ for Atoll.  Descending into both paths builds the
+# same objects concurrently when using O=, causing their temporary files to
+# race and disappear.
+obj-y += stub/ audio/
 header-y += stub/include/uapi/ audio/include/uapi/ audio/4.0/include/uapi
