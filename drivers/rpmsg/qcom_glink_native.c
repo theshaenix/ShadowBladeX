@@ -2010,6 +2010,13 @@ static void qcom_glink_cancel_rx_work(struct qcom_glink *glink)
 		kfree(dcmd);
 }
 
+#ifdef OPLUS_FEATURE_MODEM_DATA_NWPOWER
+#define GLINK_NATIVE_IRQ_NUM_MAX 10
+#define GLINK_NATIVE_IRQ_NAME_LEN 24
+static char glink_native_irq_names[GLINK_NATIVE_IRQ_NUM_MAX]
+	[GLINK_NATIVE_IRQ_NAME_LEN] = { "glink-native" };
+#endif
+
 struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 					   unsigned long features,
 					   struct qcom_glink_pipe *rx,
@@ -2023,6 +2030,12 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 	int size;
 	int irq;
 	int ret;
+#ifdef OPLUS_FEATURE_MODEM_DATA_NWPOWER
+	static int glink_native_irq_index = 1;
+	const char *irq_name = glink_native_irq_names[0];
+#else
+	const char *irq_name = "glink-native";
+#endif
 
 	glink = devm_kzalloc(dev, sizeof(*glink), GFP_KERNEL);
 	if (!glink)
@@ -2078,6 +2091,14 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 
 	irq = of_irq_get(dev->of_node, 0);
 
+#ifdef OPLUS_FEATURE_MODEM_DATA_NWPOWER
+	if (glink_native_irq_index < GLINK_NATIVE_IRQ_NUM_MAX) {
+		snprintf(glink_native_irq_names[glink_native_irq_index],
+			 GLINK_NATIVE_IRQ_NAME_LEN, "glink-native-%s", glink->name);
+		irq_name = glink_native_irq_names[glink_native_irq_index++];
+	}
+#endif
+
 	/* Use different irq flag option in case of gvm */
 	vm_support = of_property_read_bool(dev->of_node, "vm-support");
 	if (vm_support)
@@ -2088,7 +2109,7 @@ struct qcom_glink *qcom_glink_native_probe(struct device *dev,
 	ret = devm_request_irq(dev, irq,
 			       qcom_glink_native_intr,
 			       irqflags,
-			       "glink-native", glink);
+			       irq_name, glink);
 	if (ret) {
 		dev_err(dev, "failed to request IRQ\n");
 		goto unregister;
