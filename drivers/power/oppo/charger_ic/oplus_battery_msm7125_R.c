@@ -17369,44 +17369,40 @@ static void register_oplus_pdsvooc_svid(struct work_struct *work) {
 	struct oplus_chg_chip *chip = g_oplus_chip;
 	const char *pd_phandle = "qcom,oplus-pps-usbpd-detection";
 	struct smb_charger *chg;
-	struct usbpd *pd = NULL;
-	if(g_oplus_chip == NULL){
+	struct usbpd *pd;
+
+	if (!chip || !chip->pmic_spmi.smb5_chip)
 		return;
-	}
 	chg = &chip->pmic_spmi.smb5_chip->chg;
-	if(chg == NULL){
-		pr_err(" chg NULL ");
-		return;
-	}
-	if(chg->dev == NULL){
-		pr_err(" dev NULL ");
+	if (!chg->dev) {
+		chg_err("USB-PD device is unavailable\n");
 		return;
 	}
 	pd = devm_usbpd_get_by_phandle(chg->dev, pd_phandle);
-	if( pd == NULL){
-		pr_err(" pd NULL ");
-		return;
-	}
-	pr_err(" pd NULL");
 	if (IS_ERR(pd)) {
-		chg_err("oplus pps usbpd phandle failed (%ld)\n", PTR_ERR(pd));
 		rc = PTR_ERR(pd);
 		chg->oplus_pd = NULL;
-		schedule_delayed_work(&chg->regist_pd, msecs_to_jiffies(1000));
-	} else {
-		chg_err("oplus pps usbpd phandle failed (%ld)\n", PTR_ERR(pd));
-		chg->oplus_pd = pd;
-		chg->oplus_svid_handler.svid = OPPO_SVID;
-		chg->oplus_svid_handler.vdm_received = NULL;
-		chg->oplus_svid_handler.connect = oplus_usbpd_connect_cb;
-		chg->oplus_svid_handler.svdm_received = oplus_usbpd_response_cb;
-		chg->oplus_svid_handler.disconnect = oplus_usbpd_disconnect_cb;
-		rc = usbpd_register_svid(chg->oplus_pd, &chg->oplus_svid_handler);
-		if (rc){
-			chg_err("pps pd registration failed\n");
-		}
-		chg_err("pps pd registration success\n");
+		if (rc == -EPROBE_DEFER)
+			schedule_delayed_work(&chg->regist_pd, msecs_to_jiffies(1000));
+		else
+			chg_err("oplus PPS USB-PD phandle failed (%d)\n", rc);
+		return;
 	}
+	if (!pd) {
+		chg_err("oplus PPS USB-PD phandle returned NULL\n");
+		chg->oplus_pd = NULL;
+		return;
+	}
+
+	chg->oplus_pd = pd;
+	chg->oplus_svid_handler.svid = OPPO_SVID;
+	chg->oplus_svid_handler.vdm_received = NULL;
+	chg->oplus_svid_handler.connect = oplus_usbpd_connect_cb;
+	chg->oplus_svid_handler.svdm_received = oplus_usbpd_response_cb;
+	chg->oplus_svid_handler.disconnect = oplus_usbpd_disconnect_cb;
+	rc = usbpd_register_svid(chg->oplus_pd, &chg->oplus_svid_handler);
+	if (rc)
+		chg_err("PPS PD registration failed (%d)\n", rc);
 }
 static int smb5_probe(struct platform_device *pdev)
 {

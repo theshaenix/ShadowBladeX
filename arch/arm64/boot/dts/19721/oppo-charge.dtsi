@@ -264,6 +264,7 @@
 	qcom,otg-cl-ua = <1000000>;//otg current limit 1A
 	qcom,float-option = <1>;
 	qcom,lpd-disable;
+	qcom,oplus-pps-usbpd-detection = <&pm6150_pdphy>;
 
 	//for oplus chg framework:
 	qcom,input_current_charger_ma = <2000>;

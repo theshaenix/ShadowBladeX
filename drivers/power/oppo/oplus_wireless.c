@@ -168,7 +168,6 @@ void oplus_wpc_dcin_irq_enable(bool enable)
 bool oplus_wireless_charge_start(void)
 {
 	if (!g_wpc_chip) {
-		chg_err("g_wpc_chip null, return\n");
 		return false;
 	}
 	if (g_wpc_chip->wpc_ops->wireless_charge_start) {

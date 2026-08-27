@@ -2176,9 +2176,10 @@ int oplus_chg_init(struct oplus_chg_chip *chip)
 	/*ye.zhang add end*/
 	schedule_delayed_work(&chip->update_work, OPLUS_CHG_UPDATE_INIT_DELAY);
 	INIT_DELAYED_WORK(&chip->mmi_adapter_in_work, mmi_adapter_in_work_func);
-	chip->shell_themal = thermal_zone_get_zone_by_name("shell_back");
+	chip->shell_themal = thermal_zone_get_zone_by_name("xo-therm-usr");
 	if (IS_ERR(chip->shell_themal)) {
-		chg_err("Can't get shell_back\n");
+		chg_err("Can't get xo-therm-usr\n");
+		chip->shell_themal = NULL;
 	}
 	charger_xlog_printk(CHG_LOG_CRTI, " end\n");
 	return 0;
@@ -5396,7 +5397,8 @@ void oplus_charger_detect_check(struct oplus_chg_chip *chip)
 				if (oplus_vooc_get_reset_adapter_st()) {
 					oplus_chg_unsuspend_charger();
 				}
-			} else if (oplus_wireless_charge_start() == false) {
+			} else if (!chip->wireless_support ||
+					oplus_wireless_charge_start() == false) {
 				charger_xlog_printk(CHG_LOG_CRTI, "oplus_wireless_charge_start == false\n");
 				charger_resumed = chip->chg_ops->check_charger_resume();
 				oplus_chg_turn_on_charging(chip);
@@ -6147,9 +6149,11 @@ static void oplus_chg_update_ui_soc(struct oplus_chg_chip *chip)
 	} else {
 		soc_up_limit = SOC_SYNC_UP_RATE_10S;
 	}
-#ifndef WPC_NEW_INTERFACE
-	if ((chip->charger_exist || oplus_wireless_charge_start())
-			&& chip->batt_exist && chip->batt_full && chip->mmi_chg && (chip->stop_chg == 1 || chip->charger_type == 5)) {
+	#ifndef WPC_NEW_INTERFACE
+	if ((chip->charger_exist || (chip->wireless_support &&
+			oplus_wireless_charge_start())) &&
+			chip->batt_exist && chip->batt_full && chip->mmi_chg &&
+			(chip->stop_chg == 1 || chip->charger_type == 5)) {
 #else
 	if ((chip->charger_exist || oplus_wpc_get_status())
 			&& chip->batt_exist && chip->batt_full && chip->mmi_chg && (chip->stop_chg == 1 || chip->charger_type == 5)) {
@@ -6181,9 +6185,11 @@ static void oplus_chg_update_ui_soc(struct oplus_chg_chip *chip)
 				chip->soc, chip->ui_soc, chip->smooth_soc, soc_up_limit);
 
 		}
-#ifndef WPC_NEW_INTERFACE
-	} else if ((chip->charger_exist || oplus_wireless_charge_start()) && chip->batt_exist && (CHARGING_STATUS_FAIL != chip->charging_state)
-				&& chip->mmi_chg && (chip->stop_chg == 1 || chip->charger_type == 5)) {
+	#ifndef WPC_NEW_INTERFACE
+	} else if ((chip->charger_exist || (chip->wireless_support &&
+			oplus_wireless_charge_start())) && chip->batt_exist &&
+			chip->charging_state != CHARGING_STATUS_FAIL && chip->mmi_chg &&
+			(chip->stop_chg == 1 || chip->charger_type == 5)) {
 #else
 	} else if ((chip->charger_exist || oplus_wpc_get_status()) && chip->batt_exist && (CHARGING_STATUS_FAIL != chip->charging_state)
 					&& chip->mmi_chg && (chip->stop_chg == 1 || chip->charger_type == 5)) {
@@ -7859,9 +7865,8 @@ int oplus_chg_override_by_shell_temp(int temp)
 int oplus_chg_get_shell_temp(void) {
 	int temp_val = 0, rc = -EINVAL;
 
-	if (!g_charger_chip) {
+	if (!g_charger_chip || !g_charger_chip->shell_themal)
 		return TEMPERATURE_INVALID;
-	}
 
 	rc = thermal_zone_get_temp(g_charger_chip->shell_themal, &temp_val);
 	if (rc) {
@@ -8511,4 +8516,3 @@ int oplus_chg_match_temp_for_chging(void)
 						batt_temp, shell_temp, chging_temp);
 	return chging_temp;
 }
-
