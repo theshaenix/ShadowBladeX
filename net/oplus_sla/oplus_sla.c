@@ -3964,12 +3964,12 @@ static void oplus_sla_work_queue_func(struct work_struct *work)
 	send_speed_and_rtt_to_user();
 }
 
-static void oplus_sla_timer_function(void)
+static void oplus_sla_timer_function(struct timer_list *timer)
 {
 	if (workqueue_sla){
 		queue_work(workqueue_sla, &oplus_sla_work);
 	}
-	mod_timer(&sla_timer, jiffies + SLA_TIMER_EXPIRES);
+	mod_timer(timer, jiffies + SLA_TIMER_EXPIRES);
 
 }
 
@@ -3979,12 +3979,7 @@ static void oplus_sla_timer_function(void)
 */
 static void oplus_sla_timer_init(void)
 {
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(4,19,0))
-	init_timer(&sla_timer);
-	sla_timer.function = (void*)oplus_sla_timer_function;
-#else
-	timer_setup(&sla_timer, (void*)oplus_sla_timer_function, 0);
-#endif
+	timer_setup(&sla_timer, oplus_sla_timer_function, 0);
 
 	sla_timer.expires = jiffies +  SLA_TIMER_EXPIRES;// timer expires in ~1s
 	add_timer (&sla_timer);
