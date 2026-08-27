@@ -238,11 +238,7 @@ void static_key_slow_dec_cpuslocked(struct static_key *key)
 void static_key_slow_dec_deferred(struct static_key_deferred *key)
 {
 	STATIC_KEY_CHECK_USE();
-
-	if (static_key_slow_try_dec(key))
-		return;
-
-	queue_delayed_work(system_power_efficient_wq, work, timeout);
+	__static_key_slow_dec(&key->key, key->timeout, &key->work);
 }
 EXPORT_SYMBOL_GPL(static_key_slow_dec_deferred);
 
