@@ -104,18 +104,33 @@ echo -e "🧵 \033[1;36mParallel build jobs: $JOBS\033[0m"
 # =====================[ DEFCONFIG ]=====================
 
 echo -e "\n📄 \033[1;36mSetting up defconfig...\033[0m"
-make O=$OUT_DIR ARCH=arm64 atoll_defconfig
+make O=$OUT_DIR ARCH=arm64 LLVM=1 LLVM_IAS=1 atoll_defconfig
 
 if [ $? -ne 0 ]; then
   echo -e "\n❌ \033[1;31mDefconfig failed. Exiting.\033[0m"
   exit 1
 fi
 
+required_configs=(
+  CONFIG_AS_IS_LLVM CONFIG_CC_IS_CLANG CONFIG_HIDRAW
+  CONFIG_HID_PLAYSTATION CONFIG_LD_IS_LLD CONFIG_NET_ACT_BPF
+  CONFIG_NET_ACT_POLICE CONFIG_NET_CLS_MATCHALL CONFIG_NET_SCH_TBF
+  CONFIG_PLAYSTATION_FF CONFIG_RD_LZ4
+)
+for config in "${required_configs[@]}"; do
+  if ! grep -qx "$config=y" "$OUT_DIR/.config"; then
+    echo -e "\n❌ \033[1;31mRequired kernel config missing: $config\033[0m"
+    exit 1
+  fi
+done
+
 # =====================[ COMPILING ]=====================
 
 echo -e "\n🚀 \033[1;35mStarting compilation...\033[0m"
 make -j"$JOBS" O=$OUT_DIR \
   ARCH=arm64 \
+  LLVM=1 \
+  LLVM_IAS=1 \
   CC=clang \
   LD=ld.lld \
   AR=llvm-ar \
