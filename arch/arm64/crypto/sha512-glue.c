@@ -25,14 +25,14 @@ MODULE_LICENSE("GPL v2");
 MODULE_ALIAS_CRYPTO("sha384");
 MODULE_ALIAS_CRYPTO("sha512");
 
-asmlinkage void sha512_block_data_order(u32 *digest, const void *data,
-					unsigned int num_blks);
+asmlinkage void sha512_block_data_order(struct sha512_state *state,
+				       const u8 *data, int num_blks);
 
 static int sha512_update(struct shash_desc *desc, const u8 *data,
 			 unsigned int len)
 {
 	return sha512_base_do_update(desc, data, len,
-			(sha512_block_fn *)sha512_block_data_order);
+			sha512_block_data_order);
 }
 
 static int sha512_finup(struct shash_desc *desc, const u8 *data,
@@ -40,9 +40,9 @@ static int sha512_finup(struct shash_desc *desc, const u8 *data,
 {
 	if (len)
 		sha512_base_do_update(desc, data, len,
-			(sha512_block_fn *)sha512_block_data_order);
+			sha512_block_data_order);
 	sha512_base_do_finalize(desc,
-			(sha512_block_fn *)sha512_block_data_order);
+			sha512_block_data_order);
 
 	return sha512_base_finish(desc, out);
 }
