@@ -3,8 +3,8 @@ name: Kernel Build
 on:
   push:
     branches:
-      - astra
-      - astra-ksu
+      - Nezuko
+      - Nezuko-ksu
       - mcqueen-ksu
       - mcqueen
   pull_request:
