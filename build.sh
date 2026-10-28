@@ -40,11 +40,11 @@ fi
 # ============================================================
 
 # Kernel build configuration
-KERNEL_NAME="Astra-thenoah77-"
+KERNEL_NAME="Nezuko-"
 DEVICE="RMX2061"
 VARIANT="perf"
 BUILD_TYPE="KSU"
-VERSION_NUMBER="v1.0.1"
+VERSION_NUMBER="v1"
 
 DATE=$(date +%Y%m%d)
 TIME=$(date +%H%M)
