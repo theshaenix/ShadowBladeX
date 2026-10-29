@@ -5,9 +5,9 @@
 # ============================================================
 
 # Paths
-CLANG_DIR=~/toolchains/clang
-GCC_DIR=~/toolchains/gcc-aarch64-linux-gnu-9.3
-ANYKERNEL_DIR=~/AnyKernel3
+CLANG_DIR=\~/toolchains/clang
+GCC_DIR=\~/toolchains/gcc-aarch64-linux-gnu-9.3
+ANYKERNEL_DIR=\~/AnyKernel3
 
 # Check Clang
 if [ ! -d "$CLANG_DIR" ]; then
@@ -35,24 +35,54 @@ else
   echo -e "\n✅ \033[1;32mAnyKernel3 folder already present.\033[0m"
 fi
 
+# =====================[ UPDATE ANYKERNEL STRING ]=====================
+echo -e "\n✏️  \033[1;36mUpdating AnyKernel branding...\033[0m"
+
+KERNEL_STRING="Nezuko BakaSU | RMX2061"
+FLASH_MESSAGE="Nezuko BakaSU flashed successfully!"
+
+if [ -f "$ANYKERNEL_DIR/anykernel.sh" ]; then
+  sed -i "s|^kernel.string=.*|kernel.string=${KERNEL_STRING}|" "$ANYKERNEL_DIR/anykernel.sh"
+  sed -i "s|Ka-chow!.*McQueen is ready to race.|${FLASH_MESSAGE}|" "$ANYKERNEL_DIR/anykernel.sh"
+  echo -e "✅ kernel.string  → ${KERNEL_STRING}"
+  echo -e "✅ flash message  → ${FLASH_MESSAGE}"
+else
+  echo -e "⚠️  anykernel.sh not found"
+fi
+
+# =====================[ SETUP BAKASU ]=====================
+echo -e "\n🔥 Setting up BakaSU..."
+
+rm -rf drivers/kernelsu KernelSU
+git clone --depth=1 https://github.com/Baka-SU/BakaSU.git KernelSU
+ln -sf ../KernelSU/kernel drivers/kernelsu
+
+if ! grep -q "kernelsu" drivers/Makefile; then
+  echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+fi
+
+if ! grep -q "kernelsu" drivers/Kconfig; then
+  sed -i '/endmenu/i\source "drivers/kernelsu/Kconfig"' drivers/Kconfig
+fi
+
+echo -e "✅ BakaSU ready"
+
 # ============================================================
-# Build Script
+# Build configuration
 # ============================================================
 
-# Kernel build configuration
 KERNEL_NAME="Nezuko-"
 DEVICE="RMX2061"
 VARIANT="perf"
-BUILD_TYPE="KSU"
+BUILD_TYPE="BakaSU"
 VERSION_NUMBER="v1"
 
 DATE=$(date +%Y%m%d)
 TIME=$(date +%H%M)
-BASE_ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${TIME}-${DATE}-${VERSION_NUMBER}"
+BASE_ZIPNAME="\( {KERNEL_NAME}- \){VARIANT}-\( {DEVICE}- \){BUILD_TYPE}-\( {TIME}- \){DATE}-${VERSION_NUMBER}"
 ZIPNAME="${BASE_ZIPNAME}.zip"
 
-# Paths
-export KERNEL_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+export KERNEL_ROOT="\( ( cd " \)( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 export CLANG_PATH=$CLANG_DIR
 export GCC_PATH=$GCC_DIR
 export ANYKERNEL_DIR=$ANYKERNEL_DIR
@@ -63,13 +93,8 @@ export ARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
 
-# Allow constrained builders to lower parallelism without editing this script.
-JOBS="${JOBS:-$(nproc)}"
+JOBS="\( {JOBS:- \)(nproc)}"
 
-# The filtered live output keeps routine builds readable, while build.log keeps
-# the complete compiler output.  When a target fails, show the first failure
-# and the preceding lines from that raw log; this is usually where clang (or a
-# host tool) explains why the subsequent missing-object errors occurred.
 show_first_failure_context() {
   local failure_line context_start context_end
 
@@ -81,7 +106,7 @@ show_first_failure_context() {
     context_start=$((failure_line > 40 ? failure_line - 40 : 1))
     context_end=$((failure_line + 20))
     echo -e "\n🔎 \033[1;36mFirst failure context from $OUT_DIR/build.log:\033[0m"
-    sed -n "${context_start},${context_end}p" "$OUT_DIR/build.log"
+    sed -n "\( {context_start}, \){context_end}p" "$OUT_DIR/build.log"
   fi
 }
 
@@ -111,7 +136,50 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-# Kernel FCM level 7 (Android 17, 4.14) requirements checked by the ROM's VINTF step.
+# =====================[ ENABLE BAKASU + SUSFS ]=====================
+echo -e "\n🔥 \033[1;35mEnabling BakaSU + SUSFS...\033[0m"
+
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_MANUAL_HOOK
+./scripts/config --file $OUT_DIR/.config --disable CONFIG_KSU_KPROBES_HOOK
+
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_SUS_PATH
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_SUS_MOUNT
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_SUS_KSTAT
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_TRY_UMOUNT
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_SPOOF_UNAME
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_ENABLE_LOG
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
+./scripts/config --file $OUT_DIR/.config --enable CONFIG_KSU_SUSFS_SUS_MAP
+./scripts/config --file $OUT_DIR/.config --disable CONFIG_KSU_SUSFS_SUS_MEMFD
+
+make O=$OUT_DIR ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+
+echo -e "\n🔍 \033[1;36mVerifying KernelSU configs...\033[0m"
+if grep -q "CONFIG_KSU=y" "$OUT_DIR/.config"; then
+  echo -e "✅ CONFIG_KSU=y"
+else
+  echo -e "❌ CONFIG_KSU not enabled!"
+  exit 1
+fi
+
+if grep -q "CONFIG_KSU_MANUAL_HOOK=y" "$OUT_DIR/.config"; then
+  echo -e "✅ CONFIG_KSU_MANUAL_HOOK=y"
+else
+  echo -e "❌ CONFIG_KSU_MANUAL_HOOK not enabled!"
+  exit 1
+fi
+
+if grep -q "CONFIG_KSU_SUSFS=y" "$OUT_DIR/.config"; then
+  echo -e "✅ CONFIG_KSU_SUSFS=y"
+else
+  echo -e "⚠️  CONFIG_KSU_SUSFS not enabled (optional)"
+fi
+
+# Kernel FCM level 7 requirements
 required_configs=(
   CONFIG_AS_IS_LLVM CONFIG_CC_IS_CLANG CONFIG_CFI_CLANG CONFIG_HIDRAW
   CONFIG_HID_PLAYSTATION CONFIG_KFENCE CONFIG_LD_IS_LLD CONFIG_NET_ACT_BPF
