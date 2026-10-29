@@ -41,6 +41,10 @@ jobs:
             ~/AnyKernel3
           key: ${{ runner.os }}-kernel-tools-v1
 
+      - name: Add BakaSU
+        run: |
+          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash -s main
+
       - name: Build kernel
         run: bash ./build.sh
 
@@ -89,7 +93,7 @@ jobs:
           fi
           FILE_SIZE=$(du -sh "${ZIP_PATH}" | cut -f1)
           escape_html() { printf '%s' "$1" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g'; }
-          CAPTION=$(printf '<b>⚡ ShadowBladeX Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>By:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
+          CAPTION=$(printf '<b>⚡ Nezuko-BakaSU Kernel Build</b>\n\n<b>Branch:</b> %s\n<b>Commit:</b> <code>%s</code>\n<b>Message:</b> %s\n<b>By:</b> %s\n<b>Built:</b> %s\n<b>Size:</b> %s\n\n<b>File:</b> <code>%s</code>' \
             "$(escape_html "${BRANCH_NAME}")" \
             "${SHORT_SHA}" \
             "$(escape_html "${COMMIT_MSG}")" \
