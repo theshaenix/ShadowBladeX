@@ -13,8 +13,15 @@ export KERNEL_ROOT
 KERNEL_NAME="Nezuko"
 DEVICE="RMX2061"
 VARIANT="perf"
-BUILD_TYPE="BakaSU"
 VERSION_NUMBER="v1"
+
+# KSU: 1 = pasang BakaSU, 0 = build kontrol TANPA root (untuk uji bootloop)
+ENABLE_KSU="${ENABLE_KSU:-0}"
+if [ "$ENABLE_KSU" = "1" ]; then
+  BUILD_TYPE="BakaSU"
+else
+  BUILD_TYPE="NoKSU"
+fi
 
 # Nama defconfig. Kosongkan untuk deteksi otomatis.
 DEFCONFIG="${DEFCONFIG:-}"
@@ -74,6 +81,13 @@ else
   echo -e "\n✅ \033[1;32mAnyKernel3 folder already present.\033[0m"
 fi
 
+# Pakai anykernel.sh milik repo kernel ini (ak3/anykernel.sh) jika ada,
+# supaya tidak bergantung pada repo AnyKernel3 pihak ketiga.
+if [ -f "$KERNEL_ROOT/ak3/anykernel.sh" ]; then
+  cp "$KERNEL_ROOT/ak3/anykernel.sh" "$ANYKERNEL_DIR/anykernel.sh"
+  echo -e "\n✅ \033[1;32mMemakai ak3/anykernel.sh dari repo kernel.\033[0m"
+fi
+
 # ---------------------[ AnyKernel branding ]---------------------
 echo -e "\n✏️  \033[1;36mUpdating AnyKernel branding...\033[0m"
 
@@ -90,22 +104,26 @@ fi
 # ============================================================
 # Setup BakaSU
 # ============================================================
-echo -e "\n🔥 \033[1;35mSetting up BakaSU...\033[0m"
+if [ "$ENABLE_KSU" = "1" ]; then
+  echo -e "\n🔥 \033[1;35mSetting up BakaSU...\033[0m"
 
-rm -rf drivers/kernelsu KernelSU
-git clone --depth=1 https://github.com/Baka-SU/BakaSU.git KernelSU \
-  || die "Failed to clone BakaSU."
-ln -sf ../KernelSU/kernel drivers/kernelsu
+  rm -rf drivers/kernelsu KernelSU
+  git clone --depth=1 https://github.com/Baka-SU/BakaSU.git KernelSU \
+    || die "Failed to clone BakaSU."
+  ln -sf ../KernelSU/kernel drivers/kernelsu
 
-if ! grep -q "kernelsu" drivers/Makefile; then
-  echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+  if ! grep -q "kernelsu" drivers/Makefile; then
+    echo 'obj-$(CONFIG_KSU) += kernelsu/' >> drivers/Makefile
+  fi
+
+  if ! grep -q "kernelsu" drivers/Kconfig; then
+    sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
+  fi
+
+  echo -e "✅ BakaSU ready"
+else
+  echo -e "\n⏭️  \033[1;33mENABLE_KSU=0: BakaSU dilewati (build kontrol).\033[0m"
 fi
-
-if ! grep -q "kernelsu" drivers/Kconfig; then
-  sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
-fi
-
-echo -e "✅ BakaSU ready"
 
 # ============================================================
 # Environment
@@ -178,53 +196,61 @@ make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 "$DEFCONFIG" \
 # ============================================================
 # Enable BakaSU (+ SUSFS opsional)
 # ============================================================
-echo -e "\n🔥 \033[1;35mEnabling BakaSU...\033[0m"
-
 CFG="./scripts/config --file $OUT_DIR/.config"
 
-$CFG --enable CONFIG_KSU
-$CFG --enable CONFIG_KSU_MANUAL_HOOK
-$CFG --disable CONFIG_KSU_KPROBES_HOOK
+if [ "$ENABLE_KSU" = "1" ]; then
+  echo -e "\n🔥 \033[1;35mEnabling BakaSU...\033[0m"
 
-if [ "$ENABLE_SUSFS" = "1" ]; then
-  echo -e "🛡️  \033[1;35mEnabling SUSFS...\033[0m"
-  $CFG --enable CONFIG_KSU_SUSFS
-  $CFG --enable CONFIG_KSU_SUSFS_SUS_PATH
-  $CFG --enable CONFIG_KSU_SUSFS_SUS_MOUNT
-  $CFG --enable CONFIG_KSU_SUSFS_SUS_KSTAT
-  $CFG --enable CONFIG_KSU_SUSFS_TRY_UMOUNT
-  $CFG --enable CONFIG_KSU_SUSFS_SPOOF_UNAME
-  $CFG --enable CONFIG_KSU_SUSFS_ENABLE_LOG
-  $CFG --enable CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-  $CFG --enable CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-  $CFG --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
-  $CFG --enable CONFIG_KSU_SUSFS_SUS_MAP
-  $CFG --disable CONFIG_KSU_SUSFS_SUS_MEMFD
-fi
 
-make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+  $CFG --enable CONFIG_KSU
+  $CFG --enable CONFIG_KSU_MANUAL_HOOK
+  $CFG --disable CONFIG_KSU_KPROBES_HOOK
 
-echo -e "\n🔍 \033[1;36mVerifying configs...\033[0m"
-
-grep -q "CONFIG_KSU=y" "$OUT_DIR/.config" \
-  || die "CONFIG_KSU not enabled! (cek Kconfig BakaSU / symlink drivers/kernelsu)"
-echo -e "✅ CONFIG_KSU=y"
-
-grep -q "CONFIG_KSU_MANUAL_HOOK=y" "$OUT_DIR/.config" \
-  || die "CONFIG_KSU_MANUAL_HOOK not enabled!"
-echo -e "✅ CONFIG_KSU_MANUAL_HOOK=y"
-
-if [ "$ENABLE_SUSFS" = "1" ]; then
-  if grep -q "CONFIG_KSU_SUSFS=y" "$OUT_DIR/.config"; then
-    echo -e "✅ CONFIG_KSU_SUSFS=y"
-  else
-    echo -e "⚠️  CONFIG_KSU_SUSFS not enabled (patch SUSFS 4.14 mungkin belum terpasang)"
+  if [ "$ENABLE_SUSFS" = "1" ]; then
+    echo -e "🛡️  \033[1;35mEnabling SUSFS...\033[0m"
+    $CFG --enable CONFIG_KSU_SUSFS
+    $CFG --enable CONFIG_KSU_SUSFS_SUS_PATH
+    $CFG --enable CONFIG_KSU_SUSFS_SUS_MOUNT
+    $CFG --enable CONFIG_KSU_SUSFS_SUS_KSTAT
+    $CFG --enable CONFIG_KSU_SUSFS_TRY_UMOUNT
+    $CFG --enable CONFIG_KSU_SUSFS_SPOOF_UNAME
+    $CFG --enable CONFIG_KSU_SUSFS_ENABLE_LOG
+    $CFG --enable CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+    $CFG --enable CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+    $CFG --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
+    $CFG --enable CONFIG_KSU_SUSFS_SUS_MAP
+    $CFG --disable CONFIG_KSU_SUSFS_SUS_MEMFD
   fi
-fi
 
-# Peringatan: manual hook harus sudah dipatch di source kernel
-if ! grep -q "ksu_handle" fs/exec.c 2>/dev/null; then
-  echo -e "⚠️  \033[1;33mHook KSU tidak ditemukan di fs/exec.c. Manual hook belum dipatch?\033[0m"
+  make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+
+  echo -e "\n🔍 \033[1;36mVerifying configs...\033[0m"
+
+  grep -q "CONFIG_KSU=y" "$OUT_DIR/.config" \
+    || die "CONFIG_KSU not enabled! (cek Kconfig BakaSU / symlink drivers/kernelsu)"
+  echo -e "✅ CONFIG_KSU=y"
+
+  grep -q "CONFIG_KSU_MANUAL_HOOK=y" "$OUT_DIR/.config" \
+    || die "CONFIG_KSU_MANUAL_HOOK not enabled!"
+  echo -e "✅ CONFIG_KSU_MANUAL_HOOK=y"
+
+  if [ "$ENABLE_SUSFS" = "1" ]; then
+    if grep -q "CONFIG_KSU_SUSFS=y" "$OUT_DIR/.config"; then
+      echo -e "✅ CONFIG_KSU_SUSFS=y"
+    else
+      echo -e "⚠️  CONFIG_KSU_SUSFS not enabled (patch SUSFS 4.14 mungkin belum terpasang)"
+    fi
+  fi
+
+  # Peringatan: manual hook harus sudah dipatch di source kernel
+  if ! grep -q "ksu_handle" fs/exec.c 2>/dev/null; then
+    echo -e "⚠️  \033[1;33mHook KSU tidak ditemukan di fs/exec.c. Manual hook belum dipatch?\033[0m"
+  fi
+else
+  echo -e "\n🚫 \033[1;33mMematikan KSU/SUSFS (build kontrol)...\033[0m"
+  $CFG --disable CONFIG_KSU
+  $CFG --disable CONFIG_KSU_SUSFS
+  make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
 fi
 
 # ============================================================
