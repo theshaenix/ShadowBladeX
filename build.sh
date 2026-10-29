@@ -16,7 +16,7 @@ VARIANT="perf"
 VERSION_NUMBER="v1"
 
 # KSU: 1 = pasang BakaSU, 0 = build kontrol TANPA root (untuk uji bootloop)
-ENABLE_KSU="${ENABLE_KSU:-0}"
+ENABLE_KSU="${ENABLE_KSU:-1}"
 if [ "$ENABLE_KSU" = "1" ]; then
   BUILD_TYPE="BakaSU"
 else
