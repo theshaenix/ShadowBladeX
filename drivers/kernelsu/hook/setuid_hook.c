@@ -40,8 +40,7 @@ static inline bool is_zygote_isolated_service_uid(uid_t uid)
 
 static inline bool is_zygote_normal_app_uid(uid_t uid)
 {
-    uid %= 100000;
-    return (uid >= 10000 && uid < 19999);
+    return is_appuid(uid);
 }
 
 extern u32 susfs_zygote_sid;
@@ -145,7 +144,8 @@ int ksu_handle_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 
 // Check if spawned process is normal user app and needs to be umounted
 #ifdef CONFIG_KSU_SUSFS
-    if (likely(is_zygote_normal_app_uid(new_uid) && ksu_uid_should_umount(new_uid))) {
+    if (likely((is_zygote_normal_app_uid(new_uid) || new_uid == WEBVIEW_ZYGOTE_UID) &&
+               ksu_uid_should_umount(new_uid))) {
         goto do_umount;
     }
 #endif // #ifdef CONFIG_KSU_SUSFS
