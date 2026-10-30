@@ -58,8 +58,9 @@ die() {
 # ============================================================
 mkdir -p "$HOME/toolchains"
 
-if [ ! -d "$CLANG_DIR" ]; then
+if [ ! -x "$CLANG_DIR/bin/clang" ]; then
   echo -e "\n🔍 \033[1;33mClang toolchain not found. Cloning...\033[0m"
+  rm -rf "$CLANG_DIR"
   git clone --depth=1 --branch lineage-20.0 \
     https://github.com/LineageOS/android_prebuilts_clang_kernel_linux-x86_clang-r416183b.git \
     "$CLANG_DIR" || die "Failed to clone Clang."
@@ -67,8 +68,9 @@ else
   echo -e "\n✅ \033[1;32mClang toolchain already present.\033[0m"
 fi
 
-if [ ! -d "$GCC_DIR" ]; then
+if [ ! -x "$GCC_DIR/bin/aarch64-linux-gcc" ]; then
   echo -e "\n🔍 \033[1;33mGCC toolchain not found. Cloning...\033[0m"
+  rm -rf "$GCC_DIR"
   git clone --depth=1 --branch lineage-23.0 \
     https://github.com/LineageOS/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-gnu-9.3.git \
     "$GCC_DIR" || die "Failed to clone GCC."
@@ -76,8 +78,9 @@ else
   echo -e "\n✅ \033[1;32mGCC toolchain already present.\033[0m"
 fi
 
-if [ ! -d "$ANYKERNEL_DIR" ]; then
+if [ ! -f "$ANYKERNEL_DIR/tools/ak3-core.sh" ]; then
   echo -e "\n🔍 \033[1;33mAnyKernel3 not found. Cloning...\033[0m"
+  rm -rf "$ANYKERNEL_DIR"
   git clone --depth=1 https://github.com/theshaenix/AnyKernel3.git \
     "$ANYKERNEL_DIR" || die "Failed to clone AnyKernel3."
 else
@@ -121,50 +124,48 @@ if [ "$ENABLE_KSU" = "1" ]; then
 
   if ! grep -q "kernelsu" drivers/Kconfig; then
     sed -i '/^endmenu/i source "drivers/kernelsu/Kconfig"' drivers/Kconfig
-  fi
+# Pastikan yang dipakai adalah toolchain kita, bukan clang bawaan runner
+case "$(command -v clang)" in
+  "$CLANG_DIR"/*) ;;
+  *) die "Clang yang terpakai bukan toolchain: $(command -v clang). Hapus cache toolchain di GitHub Actions." ;;
+esac
+command -v "${CROSS_COMPILE}gcc" > /dev/null 2>&1 \
+  || die "${CROSS_COMPILE}gcc tidak ditemukan di $GCC_DIR/bin. Hapus cache toolchain di GitHub Actions."
 
-  echo -e "✅ BakaSU ready"
+if command -v ccache > /dev/null 2>&1; then
+  CC_CMD="ccache clang"
 else
-  echo -e "\n⏭️  \033[1;33mENABLE_KSU=0: BakaSU dilewati (build kontrol).\033[0m"
+  CC_CMD="clang"
 fi
 
+show_first_failure_context() {
+  local failure_line context_start context_end
+
+  failure_line=$(grep -n -m1 -E \
+    '(^|: )(fatal )?error:|fatal:|clang:.*(unable|crash)|make(\[[0-9]+\])?: \*\*\*' \
+    "$OUT_DIR/build.log" | cut -d: -f1)
+
+  if [ -n "$failure_line" ]; then
+    context_start=$((failure_line > 40 ? failure_line - 40 : 1))
+    context_end=$((failure_line + 20))
+    echo -e "\n🔎 \033[1;36mFirst failure context from $OUT_DIR/build.log:\033[0m"
+    sed -n "${context_start},${context_end}p" "$OUT_DIR/build.log"
+  fi
+}
+
 # ============================================================
-# Environment
+# Start
 # ============================================================
-export ARCH=arm64
-export CLANG_TRIPLE=aarch64-linux-gnu-
-export CROSS_COMPILE=aarch64-linux-
+echo -e "\n🛠️  \033[1;34mStarting Kernel Build: $BASE_ZIPNAME\033[0m"
+
+echo -e "\n🧹 \033[1;33mCleaning output...\033[0m"
+rm -rf "${OUT_DIR:?}"/*
+mkdir -p "$OUT_DIR"
 rm -f "$ANYKERNEL_DIR/zImage" "$ANYKERNEL_DIR"/*.zip
 
 echo -e "\n🔧 \033[1;36mCompiler Info:\033[0m"
 clang --version | head -n 1
 "${CROSS_COMPILE}gcc" --version | head -n 1
-
-echo -e "\n📱 \033[1;32mTarget Device: $DEVICE\033[0m"
-echo -e "🧵 \033[1;36mParallel build jobs: $JOBS\033[0m"
-
-# ============================================================
-# Defconfig
-# ============================================================
-if [ -z "$DEFCONFIG" ]; then
-  ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${TIME}-${DATE}-${VERSION_NUMBER}.zip"
-fi
-
-if [ "$ENABLE_KSU" = "1" ]; then
-  echo -e "\n🔥 \033[1;35mEnabling BakaSU...\033[0m"
-
-
-  $CFG --enable CONFIG_KSU
-  $CFG --enable CONFIG_KSU_MANUAL_HOOK
-  $CFG --disable CONFIG_KSU_KPROBES_HOOK
-
-  if [ "$ENABLE_SUSFS" = "1" ]; then
-    echo -e "🛡️  \033[1;35mEnabling SUSFS...\033[0m"
-      echo -e "✅ CONFIG_KSU_SUSFS=y"
-    else
-      echo -e "⚠️  CONFIG_KSU_SUSFS not enabled (patch SUSFS 4.14 mungkin belum terpasang)"
-    fi
-  fi
 
   # Peringatan: manual hook harus sudah dipatch di source kernel
   if ! grep -q "ksu_handle" fs/exec.c 2>/dev/null; then
@@ -172,6 +173,20 @@ if [ "$ENABLE_KSU" = "1" ]; then
   fi
 else
   echo -e "\n🚫 \033[1;33mMematikan KSU/SUSFS (build kontrol)...\033[0m"
+  $CFG --disable CONFIG_KSU
+  $CFG --disable CONFIG_KSU_SUSFS
+  make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
+fi
+
+echo -e "\n📋 \033[1;36mConfig terkait (KSU / SUSFS / KPROBES / PSTORE):\033[0m"
+grep -E "^(# )?CONFIG_(KSU|KPROBES|HAVE_KPROBES|PSTORE|PANIC_ON_OOPS|BOOTPARAM|DETECT_HUNG)" "$OUT_DIR/.config" || true
+
+# ============================================================
+# Compile
+# ============================================================
+echo -e "\n🚀 \033[1;35mStarting compilation...\033[0m"
+make -j"$JOBS" O="$OUT_DIR" \
+  ARCH=arm64 \
   LLVM=1 \
   LLVM_IAS=1 \
   CC="$CC_CMD" \
