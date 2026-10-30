@@ -18,15 +18,16 @@ VERSION_NUMBER="v1"
 # KSU: 1 = pasang BakaSU, 0 = build kontrol TANPA root (untuk uji bootloop)
 ENABLE_KSU="${ENABLE_KSU:-1}"
 
-# Versi BakaSU yang di-clone: main, atau tag (mis. v4.1.0, v4.0.0, v3.2.0)
-BAKASU_REF="${BAKASU_REF:-v4.1.0}"
+# Versi BakaSU yang di-clone: main, atau tag v4.2.0-rc1 / rc2 / rc3.
+# JANGAN pakai tag lama (<= v4.1.0): masih era SukiSU-Ultra, manual hook non-aktif.
+BAKASU_REF="${BAKASU_REF:-main}"
 
-# Jaga-jaga: kalau nilai kosong atau salah ketik, pakai v4.1.0
+# Jaga-jaga: kalau nilai kosong atau salah ketik, pakai main
 case "$BAKASU_REF" in
   main|v[0-9]*.[0-9]*) ;;
   *)
-    echo "⚠️  BAKASU_REF tidak valid ('$BAKASU_REF'), memakai v4.1.0"
-    BAKASU_REF="v4.1.0"
+    echo "⚠️  BAKASU_REF tidak valid ('$BAKASU_REF'), memakai main"
+    BAKASU_REF="main"
     ;;
 esac
 
@@ -43,7 +44,11 @@ DEFCONFIG="${DEFCONFIG:-}"
 ENABLE_SUSFS="${ENABLE_SUSFS:-0}"
 
 # DEBUG: 1 = ubah hang/lockup menjadi panic supaya tercatat di pstore (ramoops)
-ENABLE_DEBUG="${ENABLE_DEBUG:-0}"
+# (sementara 1 untuk build diagnostik; kembalikan ke 0 setelah BakaSU berhasil boot)
+ENABLE_DEBUG="${ENABLE_DEBUG:-1}"
+
+# CFI: 1 = matikan CFI + ShadowCallStack (uji kompatibilitas BakaSU dengan kernel 4.14 ini)
+DISABLE_CFI="${DISABLE_CFI:-0}"
 
 KERNEL_STRING="Nezuko BakaSU | RMX2061"
 FLASH_MESSAGE="Nezuko BakaSU flashed successfully!"
@@ -127,8 +132,14 @@ if [ "$ENABLE_KSU" = "1" ]; then
   echo -e "\n🔥 \033[1;35mSetting up BakaSU...\033[0m"
 
   rm -rf drivers/kernelsu KernelSU
-  git clone --depth=1 --branch "$BAKASU_REF" https://github.com/Baka-SU/BakaSU.git KernelSU \
-    || die "Failed to clone BakaSU (ref: $BAKASU_REF)."
+  if [ "$BAKASU_REF" = "main" ]; then
+    git clone --depth=1 --branch main https://github.com/Baka-SU/BakaSU.git KernelSU \
+      || die "Failed to clone BakaSU (ref: main)."
+  else
+    # Tag: clone penuh (dengan riwayat git) karena Kbuild BakaSU membaca git history
+    git clone --branch "$BAKASU_REF" https://github.com/Baka-SU/BakaSU.git KernelSU \
+      || die "Failed to clone BakaSU (ref: $BAKASU_REF)."
+  fi
   echo -e "ℹ️  BakaSU ref: $BAKASU_REF ($(git -C KernelSU rev-parse --short HEAD))"
   ln -sf ../KernelSU/kernel drivers/kernelsu
 
@@ -225,6 +236,15 @@ make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 "$DEFCONFIG" \
 # Enable BakaSU (+ SUSFS opsional)
 # ============================================================
 CFG="./scripts/config --file $OUT_DIR/.config"
+
+if [ "$DISABLE_CFI" = "1" ]; then
+  echo -e "\n🧪 \033[1;33mDISABLE_CFI=1: matikan CFI + ShadowCallStack...\033[0m"
+  $CFG --disable CONFIG_CFI_PERMISSIVE
+  $CFG --disable CONFIG_CFI_CLANG
+  $CFG --disable CONFIG_SHADOW_CALL_STACK
+  BUILD_TYPE="${BUILD_TYPE}-NoCFI"
+  ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${TIME}-${DATE}-${VERSION_NUMBER}.zip"
+fi
 
 if [ "$ENABLE_DEBUG" = "1" ]; then
   echo -e "\n🐞 \033[1;33mENABLE_DEBUG=1: aktifkan pstore + panic-on-hang...\033[0m"
