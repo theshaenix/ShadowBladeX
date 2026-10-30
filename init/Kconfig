@@ -1178,7 +1178,7 @@ config SCHED_AUTOGROUP
 
 config SCHED_TUNE
 	bool "Boosting for CFS tasks (EXPERIMENTAL)"
-	depends on SMP
+	depends on SMP && CGROUPS
 	help
 	  This option enables support for task classification using a new
 	  cgroup controller, schedtune. Schedtune allows tasks to be given

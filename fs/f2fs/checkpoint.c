@@ -1707,6 +1707,11 @@ stop:
 	restore_virtual_curseg_status(sbi, false);
 	unblock_operations(sbi);
 	stat_inc_cp_count(sbi->stat_info);
+#ifdef CONFIG_F2FS_BD_STAT
+	bd_lock(sbi);
+	bd_inc_val(sbi, cp_count, 1);
+	bd_unlock(sbi);
+#endif
 
 	if (cpc->reason & CP_RECOVERY)
 		f2fs_notice(sbi, "checkpoint: version = %llx", ckpt_ver);

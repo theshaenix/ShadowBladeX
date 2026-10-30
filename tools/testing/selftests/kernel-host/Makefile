@@ -3,6 +3,7 @@
 HOSTCC ?= cc
 PYTHON ?= python3
 TESTS := test_ext4_flush.py test_bore.py test_sbalance.py \
+	test_sched_walt_trace.py test_f2fs_checkpoint_stats.py \
 	test_devfreq_lifetime.py test_devfreq_limits.py test_adrenoboost.py test_suspend.py test_ksu_profile.py test_ksu_session.py test_ksu_wrapper.py \
 	test_ksu_info.py test_ksu_events.py test_ksu_shell.py test_ksu_apk.py test_susfs_private_dir.py \
 	test_ksu_force_feature.py test_ksu_umount.py test_susfs_work.py \

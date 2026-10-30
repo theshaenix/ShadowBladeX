@@ -129,7 +129,6 @@ static int of2fs_cp_info_show(struct seq_file *seq, void *p)
 	 * max_cp_submit_time max_cp_flush_meta_time max_cp_discard_time
 	 */
 	bd_lock(sbi);
-	bd->cp_count = sbi->stat_info->cp_count;
 	seq_printf(seq, "%u %u %llu %llu %llu %llu %llu\n", bd->cp_count,
 		   bd->cp_success_count, bd->cp_time, bd->max_cp_time,
 		   bd->max_cp_submit_time, bd->max_cp_flush_meta_time,
