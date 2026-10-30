@@ -19,7 +19,16 @@ VERSION_NUMBER="v1"
 ENABLE_KSU="${ENABLE_KSU:-1}"
 
 # Versi BakaSU yang di-clone: main, atau tag (mis. v4.1.0, v4.0.0, v3.2.0)
-BAKASU_REF="${BAKASU_REF: v.4.1.0}"
+BAKASU_REF="${BAKASU_REF:-v4.1.0}"
+
+# Jaga-jaga: kalau nilai kosong atau salah ketik, pakai v4.1.0
+case "$BAKASU_REF" in
+  main|v[0-9]*.[0-9]*) ;;
+  *)
+    echo "⚠️  BAKASU_REF tidak valid ('$BAKASU_REF'), memakai v4.1.0"
+    BAKASU_REF="v4.1.0"
+    ;;
+esac
 
 if [ "$ENABLE_KSU" = "1" ]; then
   BUILD_TYPE="BakaSU-${BAKASU_REF}"
@@ -34,7 +43,7 @@ DEFCONFIG="${DEFCONFIG:-}"
 ENABLE_SUSFS="${ENABLE_SUSFS:-0}"
 
 # DEBUG: 1 = ubah hang/lockup menjadi panic supaya tercatat di pstore (ramoops)
-ENABLE_DEBUG="${ENABLE_DEBUG:-1}"
+ENABLE_DEBUG="${ENABLE_DEBUG:-0}"
 
 KERNEL_STRING="Nezuko BakaSU | RMX2061"
 FLASH_MESSAGE="Nezuko BakaSU flashed successfully!"
