@@ -61,7 +61,7 @@ static int force_feature_param_set(const char *val, const struct kernel_param *k
 		return 0;
 	}
 
-	for (; *p; p = end ? end + 1 : end) {
+	for (; *p; p = *end ? end + 1 : end) {
 		end = strchrnul(p, ',');
 		if (end == p) {
 			continue;

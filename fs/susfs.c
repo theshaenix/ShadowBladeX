@@ -731,6 +731,7 @@ void susfs_sus_kstat_spoof_proc_fd_seq_show(int *out_target_mnt_id, unsigned lon
 #ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
 static DEFINE_MUTEX(susfs_mutex_lock_try_umount);
 extern void try_umount(const char *mnt, int flags);
+extern bool ksu_is_umount_path(const char *mnt);
 static LIST_HEAD(LH_TRY_UMOUNT_PATH);
 void susfs_add_try_umount(void __user **user_info) {
 	struct st_susfs_try_umount info = {0};
@@ -772,11 +773,14 @@ out_copy_to_user:
 	SUSFS_LOGI("CMD_SUSFS_ADD_TRY_UMOUNT -> ret: %d\n", info.err);
 }
 
-void susfs_try_umount(uid_t uid) {
+void susfs_try_umount(uid_t uid, bool skip_ksu) {
 	struct st_susfs_try_umount_list *cursor = NULL;
 
 	// We should umount in reversed order
 	list_for_each_entry_reverse(cursor, &LH_TRY_UMOUNT_PATH, list) {
+		/* Leave queued mounts to KernelSU, including aliases. */
+		if (skip_ksu && ksu_is_umount_path(cursor->info.target_pathname))
+			continue;
 		SUSFS_LOGI("umounting '%s' for uid: %u\n", cursor->info.target_pathname, uid);
 		try_umount(cursor->info.target_pathname, cursor->info.mnt_mode);
 	}

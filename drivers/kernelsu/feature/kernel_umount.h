@@ -8,9 +8,10 @@
 void ksu_kernel_umount_init(void);
 void ksu_kernel_umount_exit(void);
 
-#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
- // Handler function to be called from setresuid hook
- int ksu_handle_umount(uid_t old_uid, uid_t new_uid);
+// Returns 1 when KernelSU unmount work was queued, otherwise 0.
+int ksu_handle_umount(uid_t old_uid, uid_t new_uid);
+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+bool ksu_is_umount_path(const char *mnt);
 #endif
 
 // for the umount list

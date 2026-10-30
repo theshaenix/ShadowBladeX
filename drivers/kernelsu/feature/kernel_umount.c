@@ -102,11 +102,35 @@ void try_umount(const char *mnt, int flags)
     ksu_umount_mnt(mnt, &path, flags);
 }
 
+#ifdef CONFIG_KSU_SUSFS_TRY_UMOUNT
+bool ksu_is_umount_path(const char *mnt)
+{
+	struct path path, registered;
+	struct mount_entry *entry;
+	bool found = false;
+
+	if (kern_path(mnt, 0, &path))
+		return false;
+
+	down_read(&mount_list_lock);
+	list_for_each_entry(entry, &mount_list, list) {
+		if (kern_path(entry->umountable, 0, &registered))
+			continue;
+		found = path_equal(&path, &registered);
+		path_put(&registered);
+		if (found)
+			break;
+	}
+	up_read(&mount_list_lock);
+	path_put(&path);
+	return found;
+}
+#endif
+
 struct umount_tw {
 	struct callback_head cb;
 };
 
-#if !defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
 static void umount_tw_func(struct callback_head *cb)
 {
 	struct umount_tw *tw = container_of(cb, struct umount_tw, cb);
@@ -128,7 +152,6 @@ static void umount_tw_func(struct callback_head *cb)
 int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 {
 	struct umount_tw *tw;
-#if defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
 	// if there isn't any module mounted, just ignore it!
 	if (!ksu_module_mounted) {
 		return 0;
@@ -167,7 +190,6 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 			current->pid);
 		return 0;
 	}
-#endif // #if defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
 	// umount the target mnt
 	pr_info("handle umount for uid: %d, pid: %d\n", new_uid, current->pid);
 
@@ -181,11 +203,11 @@ int ksu_handle_umount(uid_t old_uid, uid_t new_uid)
 	if (err) {
 		kfree(tw);
 		pr_warn("unmount add task_work failed\n");
+		return 0;
 	}
 
-	return 0;
+	return 1;
 }
-#endif // #if defined(CONFIG_KSU_SUSFS) || !defined(CONFIG_KSU_SUSFS_TRY_UMOUNT)
 
 void __init ksu_kernel_umount_init(void)
 {
