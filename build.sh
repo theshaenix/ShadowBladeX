@@ -29,6 +29,9 @@ DEFCONFIG="${DEFCONFIG:-}"
 # SUSFS: 0 = mati (disarankan sampai BakaSU saja sudah boot), 1 = hidup
 ENABLE_SUSFS="${ENABLE_SUSFS:-0}"
 
+# DEBUG: 1 = ubah hang/lockup menjadi panic supaya tercatat di pstore (ramoops)
+ENABLE_DEBUG="${ENABLE_DEBUG:-1}"
+
 KERNEL_STRING="Nezuko BakaSU | RMX2061"
 FLASH_MESSAGE="Nezuko BakaSU flashed successfully!"
 
@@ -131,37 +134,6 @@ fi
 export ARCH=arm64
 export CLANG_TRIPLE=aarch64-linux-gnu-
 export CROSS_COMPILE=aarch64-linux-
-export PATH="$CLANG_DIR/bin:$GCC_DIR/bin:$PATH"
-
-if command -v ccache > /dev/null 2>&1; then
-  CC_CMD="ccache clang"
-else
-  CC_CMD="clang"
-fi
-
-show_first_failure_context() {
-  local failure_line context_start context_end
-
-  failure_line=$(grep -n -m1 -E \
-    '(^|: )(fatal )?error:|fatal:|clang:.*(unable|crash)|make(\[[0-9]+\])?: \*\*\*' \
-    "$OUT_DIR/build.log" | cut -d: -f1)
-
-  if [ -n "$failure_line" ]; then
-    context_start=$((failure_line > 40 ? failure_line - 40 : 1))
-    context_end=$((failure_line + 20))
-    echo -e "\n🔎 \033[1;36mFirst failure context from $OUT_DIR/build.log:\033[0m"
-    sed -n "${context_start},${context_end}p" "$OUT_DIR/build.log"
-  fi
-}
-
-# ============================================================
-# Start
-# ============================================================
-echo -e "\n🛠️  \033[1;34mStarting Kernel Build: $BASE_ZIPNAME\033[0m"
-
-echo -e "\n🧹 \033[1;33mCleaning output...\033[0m"
-rm -rf "${OUT_DIR:?}"/*
-mkdir -p "$OUT_DIR"
 rm -f "$ANYKERNEL_DIR/zImage" "$ANYKERNEL_DIR"/*.zip
 
 echo -e "\n🔧 \033[1;36mCompiler Info:\033[0m"
@@ -175,28 +147,8 @@ echo -e "🧵 \033[1;36mParallel build jobs: $JOBS\033[0m"
 # Defconfig
 # ============================================================
 if [ -z "$DEFCONFIG" ]; then
-  for candidate in atoll_defconfig vendor/atoll-perf_defconfig vendor/atoll_defconfig; do
-    if [ -f "arch/arm64/configs/$candidate" ]; then
-      DEFCONFIG="$candidate"
-      break
-    fi
-  done
+  ZIPNAME="${KERNEL_NAME}-${VARIANT}-${DEVICE}-${BUILD_TYPE}-${TIME}-${DATE}-${VERSION_NUMBER}.zip"
 fi
-
-if [ -z "$DEFCONFIG" ] || [ ! -f "arch/arm64/configs/$DEFCONFIG" ]; then
-  echo "Defconfig tersedia (atoll):"
-  find arch/arm64/configs -name '*atoll*' 2>/dev/null
-  die "Defconfig tidak ditemukan. Set variabel DEFCONFIG di script ini."
-fi
-
-echo -e "\n📄 \033[1;36mSetting up defconfig: $DEFCONFIG\033[0m"
-make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 "$DEFCONFIG" \
-  || die "Defconfig failed. Exiting."
-
-# ============================================================
-# Enable BakaSU (+ SUSFS opsional)
-# ============================================================
-CFG="./scripts/config --file $OUT_DIR/.config"
 
 if [ "$ENABLE_KSU" = "1" ]; then
   echo -e "\n🔥 \033[1;35mEnabling BakaSU...\033[0m"
@@ -208,34 +160,6 @@ if [ "$ENABLE_KSU" = "1" ]; then
 
   if [ "$ENABLE_SUSFS" = "1" ]; then
     echo -e "🛡️  \033[1;35mEnabling SUSFS...\033[0m"
-    $CFG --enable CONFIG_KSU_SUSFS
-    $CFG --enable CONFIG_KSU_SUSFS_SUS_PATH
-    $CFG --enable CONFIG_KSU_SUSFS_SUS_MOUNT
-    $CFG --enable CONFIG_KSU_SUSFS_SUS_KSTAT
-    $CFG --enable CONFIG_KSU_SUSFS_TRY_UMOUNT
-    $CFG --enable CONFIG_KSU_SUSFS_SPOOF_UNAME
-    $CFG --enable CONFIG_KSU_SUSFS_ENABLE_LOG
-    $CFG --enable CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
-    $CFG --enable CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
-    $CFG --enable CONFIG_KSU_SUSFS_OPEN_REDIRECT
-    $CFG --enable CONFIG_KSU_SUSFS_SUS_MAP
-    $CFG --disable CONFIG_KSU_SUSFS_SUS_MEMFD
-  fi
-
-  make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
-
-  echo -e "\n🔍 \033[1;36mVerifying configs...\033[0m"
-
-  grep -q "CONFIG_KSU=y" "$OUT_DIR/.config" \
-    || die "CONFIG_KSU not enabled! (cek Kconfig BakaSU / symlink drivers/kernelsu)"
-  echo -e "✅ CONFIG_KSU=y"
-
-  grep -q "CONFIG_KSU_MANUAL_HOOK=y" "$OUT_DIR/.config" \
-    || die "CONFIG_KSU_MANUAL_HOOK not enabled!"
-  echo -e "✅ CONFIG_KSU_MANUAL_HOOK=y"
-
-  if [ "$ENABLE_SUSFS" = "1" ]; then
-    if grep -q "CONFIG_KSU_SUSFS=y" "$OUT_DIR/.config"; then
       echo -e "✅ CONFIG_KSU_SUSFS=y"
     else
       echo -e "⚠️  CONFIG_KSU_SUSFS not enabled (patch SUSFS 4.14 mungkin belum terpasang)"
@@ -248,17 +172,6 @@ if [ "$ENABLE_KSU" = "1" ]; then
   fi
 else
   echo -e "\n🚫 \033[1;33mMematikan KSU/SUSFS (build kontrol)...\033[0m"
-  $CFG --disable CONFIG_KSU
-  $CFG --disable CONFIG_KSU_SUSFS
-  make O="$OUT_DIR" ARCH=arm64 LLVM=1 LLVM_IAS=1 olddefconfig
-fi
-
-# ============================================================
-# Compile
-# ============================================================
-echo -e "\n🚀 \033[1;35mStarting compilation...\033[0m"
-make -j"$JOBS" O="$OUT_DIR" \
-  ARCH=arm64 \
   LLVM=1 \
   LLVM_IAS=1 \
   CC="$CC_CMD" \
