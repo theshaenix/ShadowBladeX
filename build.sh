@@ -34,7 +34,7 @@ DEFCONFIG="${DEFCONFIG:-}"
 ENABLE_SUSFS="${ENABLE_SUSFS:-0}"
 
 # DEBUG: 1 = ubah hang/lockup menjadi panic supaya tercatat di pstore (ramoops)
-ENABLE_DEBUG="${ENABLE_DEBUG:-0}"
+ENABLE_DEBUG="${ENABLE_DEBUG:-1}"
 
 KERNEL_STRING="Nezuko BakaSU | RMX2061"
 FLASH_MESSAGE="Nezuko BakaSU flashed successfully!"
