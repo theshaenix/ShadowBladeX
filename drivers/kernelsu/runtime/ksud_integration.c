@@ -904,6 +904,16 @@ void ksu_wait_stop_input_hook(void)
 	wait_for_completion(&stop_input_hook_work_complete);
 }
 #else
+void ksu_handle_init_rc_stat(struct file *file, struct kstat *stat)
+{
+	if (!ksu_init_rc_hook || !is_init(current_cred()) || !is_init_rc(file))
+		return;
+
+	/* Size-bounded init readers must also consume the appended boot actions. */
+	load_module_rc_once();
+	stat->size += ksu_rc_len + module_rc_len;
+}
+
 static int ksu_execve_ksud_common(const char __user *filename_user,
 				  struct user_arg_ptr *argv)
 {

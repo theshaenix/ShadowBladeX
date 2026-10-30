@@ -172,6 +172,10 @@ int vfs_getattr(const struct path *path, struct kstat *stat,
 }
 EXPORT_SYMBOL(vfs_getattr);
 
+#ifdef CONFIG_KSU_MANUAL_HOOK
+extern void ksu_handle_init_rc_stat(struct file *file, struct kstat *stat);
+#endif
+
 /**
  * vfs_statx_fd - Get the enhanced basic attributes by file descriptor
  * @fd: The file descriptor referring to the file of interest
@@ -197,6 +201,10 @@ int vfs_statx_fd(unsigned int fd, struct kstat *stat,
 	if (f.file) {
 		error = vfs_getattr(&f.file->f_path, stat,
 				    request_mask, query_flags);
+#ifdef CONFIG_KSU_MANUAL_HOOK
+		if (!error)
+			ksu_handle_init_rc_stat(f.file, stat);
+#endif
 		fdput(f);
 	}
 	return error;
