@@ -17,8 +17,12 @@ VERSION_NUMBER="v1"
 
 # KSU: 1 = pasang BakaSU, 0 = build kontrol TANPA root (untuk uji bootloop)
 ENABLE_KSU="${ENABLE_KSU:-1}"
+
+# Versi BakaSU yang di-clone: main, atau tag (mis. v4.1.0, v4.0.0, v3.2.0)
+BAKASU_REF="${BAKASU_REF: v.4.1.0}"
+
 if [ "$ENABLE_KSU" = "1" ]; then
-  BUILD_TYPE="BakaSU"
+  BUILD_TYPE="BakaSU-${BAKASU_REF}"
 else
   BUILD_TYPE="NoKSU"
 fi
@@ -30,7 +34,7 @@ DEFCONFIG="${DEFCONFIG:-}"
 ENABLE_SUSFS="${ENABLE_SUSFS:-0}"
 
 # DEBUG: 1 = ubah hang/lockup menjadi panic supaya tercatat di pstore (ramoops)
-ENABLE_DEBUG="${ENABLE_DEBUG:-1}"
+ENABLE_DEBUG="${ENABLE_DEBUG:-0}"
 
 KERNEL_STRING="Nezuko BakaSU | RMX2061"
 FLASH_MESSAGE="Nezuko BakaSU flashed successfully!"
@@ -114,8 +118,9 @@ if [ "$ENABLE_KSU" = "1" ]; then
   echo -e "\n🔥 \033[1;35mSetting up BakaSU...\033[0m"
 
   rm -rf drivers/kernelsu KernelSU
-  git clone --depth=1 https://github.com/Baka-SU/BakaSU.git KernelSU \
-    || die "Failed to clone BakaSU."
+  git clone --depth=1 --branch "$BAKASU_REF" https://github.com/Baka-SU/BakaSU.git KernelSU \
+    || die "Failed to clone BakaSU (ref: $BAKASU_REF)."
+  echo -e "ℹ️  BakaSU ref: $BAKASU_REF ($(git -C KernelSU rev-parse --short HEAD))"
   ln -sf ../KernelSU/kernel drivers/kernelsu
 
   if ! grep -q "kernelsu" drivers/Makefile; then
@@ -283,7 +288,7 @@ else
 fi
 
 echo -e "\n📋 \033[1;36mConfig terkait (KSU / SUSFS / KPROBES / PSTORE):\033[0m"
-grep -E "^(# )?CONFIG_(KSU|KPROBES|HAVE_KPROBES|PSTORE|PANIC_ON_OOPS|BOOTPARAM|DETECT_HUNG)" "$OUT_DIR/.config" || true
+grep -E "^(# )?CONFIG_(KSU|KPROBES|HAVE_KPROBES|PSTORE|PANIC_ON_OOPS|BOOTPARAM|DETECT_HUNG|KALLSYMS|STRICT_KERNEL_RWX|STRICT_MODULE_RWX|DEBUG_RODATA|RODATA|SECURITY_WRITABLE_HOOKS|CFI|SHADOW_CALL_STACK|SECURITY_SELINUX_DEVELOP)" "$OUT_DIR/.config" || true
 
 # ============================================================
 # Compile
