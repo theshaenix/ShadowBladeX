@@ -339,7 +339,7 @@ static int do_uid_granted_root(void __user *arg)
 		return -EFAULT;
 	}
 
-	cmd.granted = ksu_is_allow_uid_for_current(cmd.uid);
+	cmd.granted = ksu_is_uid_granted_root(cmd.uid);
 
 	if (copy_to_user(arg, &cmd, sizeof(cmd))) {
 		pr_err("uid_granted_root: copy_to_user failed\n");
@@ -449,7 +449,13 @@ static int do_get_feature(void __user *arg)
 
 
 	ret = ksu_get_feature(cmd.feature_id, &cmd.value, &supported);
-	cmd.supported = supported ? 1 : 0;
+	cmd.supported = 0;
+	if (supported) {
+		cmd.supported |= KSU_FEATURE_FLAG_SUPPORTED;
+		if (ksu_feature_is_forced(cmd.feature_id)) {
+			cmd.supported |= KSU_FEATURE_FLAG_FORCED;
+		}
+	}
 
 	if (ret && supported) {
 		pr_err("get_feature: failed for feature %u: %d\n", cmd.feature_id, ret);
@@ -973,13 +979,13 @@ static const struct ksu_ioctl_cmd_map ksu_ioctl_handlers[] = {
         .cmd = KSU_IOCTL_GET_APP_PROFILE,
         .name = "GET_APP_PROFILE",
         .handler = do_get_app_profile,
-        .perm_check = only_manager
+        .perm_check = manager_or_root
     },
     {
         .cmd = KSU_IOCTL_SET_APP_PROFILE,
         .name = "SET_APP_PROFILE",
         .handler = do_set_app_profile,
-        .perm_check = only_manager
+        .perm_check = manager_or_root
     },
     {
         .cmd = KSU_IOCTL_GET_FEATURE,

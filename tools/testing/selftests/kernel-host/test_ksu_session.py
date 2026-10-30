@@ -184,7 +184,21 @@ code = r'''
 #define pr_info(...) ((void)0)
 #define pr_warn(...) ((void)0)
 #define pr_err(...) ((void)0)
-#define ksu_sulog_emit(...) ((void)0)
+#define GFP_KERNEL 0
+struct ksu_sulog_pending_event { int unused; };
+static int log_captures, log_replies, log_result;
+static struct ksu_sulog_pending_event pending_log;
+static struct ksu_sulog_pending_event *ksu_sulog_capture_root_execve_kern(
+        const char *name, const char *const *argv, int flags) {
+    log_captures++;
+    return &pending_log;
+}
+static void ksu_sulog_emit_pending(struct ksu_sulog_pending_event *pending,
+                                  int result, int flags) {
+    assert(pending == &pending_log);
+    log_replies++;
+    log_result = result;
+}
 #define SU_PATH "/system/bin/su"
 #define KSUD_PATH "/data/adb/ksud"
 struct filename { char name[128]; };
@@ -232,6 +246,7 @@ int main(void) {
     ksu_su_compat_enabled = true;
     profile_error = -EPERM;
     assert(execute(SU_PATH) == -EPERM && !installs && exec_calls == 3);
+    assert(log_captures == 1 && log_replies == 1 && log_result == -EPERM);
     profile_error = 0; exec_error = -ENOENT;
     assert(execute(SU_PATH) == -ENOENT && !installs && exec_calls == 4);
     exec_error = 0;

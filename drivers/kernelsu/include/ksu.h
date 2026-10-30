@@ -29,6 +29,15 @@ static inline int endswith(const char *s, const char *t)
 
 extern struct cred* ksu_cred;
 extern bool ksu_late_loaded;
+extern bool allow_shell;
+extern bool ksu_no_custom_rc;
+extern struct selinux_policy *backup_sepolicy;
+#ifdef CONFIG_ANDROID
+#include <linux/security.h>
+#define ksu_security_secctx_to_secid security_secctx_to_secid
+#else
+int ksu_security_secctx_to_secid(const char *secdata, u32 seclen, u32 *secid);
+#endif
 #ifdef MODULE
 extern bool ksu_bundled;
 #endif
